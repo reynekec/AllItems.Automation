@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using WpfAutomation.App.Models;
 using WpfAutomation.App.Models.Flow;
+using WpfAutomation.App.Services.Flow;
 using WpfAutomation.App.ViewModels;
 
 namespace WpfAutomation.App.Views;
@@ -237,7 +238,7 @@ public partial class FlowCanvasView : UserControl
         {
             var point = eventArgs.GetPosition(FlowSurface);
             var moveTarget = ResolveDropTarget(ResolvePointerSource(point) ?? eventArgs.OriginalSource as DependencyObject, point, rejectNodeInternals: false);
-            if (moveTarget.IsAccepted && !string.IsNullOrWhiteSpace(moveTarget.LaneId))
+            if (moveTarget.IsAccepted && FlowDragDropPolicy.ShouldCommitNodeMove(moveTarget.LaneId, moveTarget.EdgeId))
             {
                 var insertIndex = ResolveInsertIndex(ViewModel, moveTarget);
                 ViewModel.MoveSelectionToLane(moveTarget.LaneId!, insertIndex);

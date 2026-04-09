@@ -671,7 +671,8 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
                 continue;
             }
 
-            var pathSegments = string.Join(" ", route.Select((point, index) => index == 0 ? $"M {point.X:0.##},{point.Y:0.##}" : $"L {point.X:0.##},{point.Y:0.##}"));
+            var pathSegments = string.Join(" ", route.Select((point, index) =>
+                FormattableString.Invariant($"{(index == 0 ? 'M' : 'L')} {point.X:0.##},{point.Y:0.##}")));
             var start = route[0];
             var end = route[^1];
             var midpoint = new Point((start.X + end.X) / 2d, (start.Y + end.Y) / 2d);

@@ -1,5 +1,7 @@
 using FluentAssertions;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Media;
 using WpfAutomation.App.Models;
 using WpfAutomation.App.Models.Flow;
 using WpfAutomation.App.Services.Flow;
@@ -298,6 +300,44 @@ public sealed class CanvasFlowTests
 
         viewModel.InteractionState.IsDropInsertPreviewVisible.Should().BeTrue();
         viewModel.InteractionState.HoveredEdgeId.Should().Be(viewModel.EdgeVisuals[0].EdgeId);
+    }
+
+    [Fact]
+    public void ViewModel_EdgePathData_UsesInvariantFormattingForFractionalCoordinates()
+    {
+        var previousCulture = CultureInfo.CurrentCulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+
+            var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
+            viewModel.HandleDrop(CreateRequest("first"), new Point(20, 20));
+            viewModel.HandleDrop(CreateRequest("second"), new Point(360, 420));
+
+            var firstNodeId = viewModel.Document.RootLane.NodeIds[0];
+            viewModel.SetSelection([firstNodeId], []);
+            viewModel.TranslateSelection(10.5, 5.25);
+
+            var pathData = viewModel.EdgeVisuals[0].PathData;
+
+            pathData.Should().Contain("220.5");
+            var parse = () => Geometry.Parse(pathData);
+            parse.Should().NotThrow();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
+    }
+
+    [Fact]
+    public void DragDropPolicy_RootLaneRequiresExplicitEdgeToCommitMove()
+    {
+        FlowDragDropPolicy.ShouldCommitNodeMove(FlowLaneIdentifiers.RootLaneId, edgeId: null).Should().BeFalse();
+        FlowDragDropPolicy.ShouldCommitNodeMove(FlowLaneIdentifiers.RootLaneId, "edge-1").Should().BeTrue();
+        FlowDragDropPolicy.ShouldCommitNodeMove("lane-loop-body", edgeId: null).Should().BeTrue();
+        FlowDragDropPolicy.ShouldCommitNodeMove(laneId: null, edgeId: "edge-1").Should().BeFalse();
     }
 
     [Fact]
