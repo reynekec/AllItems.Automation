@@ -1,0 +1,124 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Color x:Key="DockHost.SurfaceBackgroundColor">#FFF3F4F6</Color>
+    <Color x:Key="DockHost.PanelBackgroundColor">#FFFFFFFF</Color>
+    <Color x:Key="DockHost.PanelBodyBackgroundColor">#FFFCFCFD</Color>
+    <Color x:Key="DockHost.PanelBorderColor">#FFD0D7DE</Color>
+    <Color x:Key="DockHost.PanelBodyBorderColor">#FFD9DEE5</Color>
+    <Color x:Key="DockHost.SplitterColor">#FFC3CAD3</Color>
+    <Color x:Key="DockHost.EmptyStateForegroundColor">#FF6B7280</Color>
+    <Color x:Key="DockHost.AccentColor">#FF0E84B5</Color>
+    <Color x:Key="DockHost.TabHoverColor">#FFE9F2FB</Color>
+    <Color x:Key="DockHost.TabSelectedColor">#FFFFFFFF</Color>
+    <Color x:Key="DockHost.TextColor">#FF1F2937</Color>
+
+    <SolidColorBrush x:Key="DockHost.SurfaceBackgroundBrush" Color="{StaticResource DockHost.SurfaceBackgroundColor}" />
+    <SolidColorBrush x:Key="DockHost.PanelBackgroundBrush" Color="{StaticResource DockHost.PanelBackgroundColor}" />
+    <SolidColorBrush x:Key="DockHost.PanelBodyBackgroundBrush" Color="{StaticResource DockHost.PanelBodyBackgroundColor}" />
+    <SolidColorBrush x:Key="DockHost.PanelBorderBrush" Color="{StaticResource DockHost.PanelBorderColor}" />
+    <SolidColorBrush x:Key="DockHost.PanelBodyBorderBrush" Color="{StaticResource DockHost.PanelBodyBorderColor}" />
+    <SolidColorBrush x:Key="DockHost.SplitterBrush" Color="{StaticResource DockHost.SplitterColor}" />
+    <SolidColorBrush x:Key="DockHost.EmptyStateForegroundBrush" Color="{StaticResource DockHost.EmptyStateForegroundColor}" />
+    <SolidColorBrush x:Key="DockHost.AccentBrush" Color="{StaticResource DockHost.AccentColor}" />
+    <SolidColorBrush x:Key="DockHost.TabHoverBrush" Color="{StaticResource DockHost.TabHoverColor}" />
+    <SolidColorBrush x:Key="DockHost.TabSelectedBrush" Color="{StaticResource DockHost.TabSelectedColor}" />
+    <SolidColorBrush x:Key="DockHost.TextBrush" Color="{StaticResource DockHost.TextColor}" />
+
+    <Style x:Key="DockHostHeaderButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{StaticResource DockHost.TextBrush}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Host"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Host" Property="Background" Value="#FFE9F2FB" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Host" Property="Background" Value="#FFDCEBFB" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DockHostTabItemStyle" TargetType="TabItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource DockHost.TextBrush}" />
+        <Setter Property="Padding" Value="12,6,12,5" />
+        <Setter Property="Margin" Value="0,0,0,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Grid>
+                        <Border x:Name="TabRoot"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource DockHost.PanelBorderBrush}"
+                                BorderThickness="0,0,1,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="ContentSite" ContentSource="Header" VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="SelectionIndicator" Height="2" Background="{StaticResource DockHost.AccentBrush}" VerticalAlignment="Bottom" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="TabRoot" Property="Background" Value="{StaticResource DockHost.PanelBackgroundBrush}" />
+                            <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsSelected" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="TabRoot" Property="Background" Value="#FFE9F2FB" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ShowTabHeader}" Value="False">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Grid Width="0" Height="0" Visibility="Collapsed" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="DockHostSplitterStyle" TargetType="GridSplitter">
+        <Setter Property="Background" Value="{StaticResource DockHost.SplitterBrush}" />
+        <Setter Property="Opacity" Value="0.9" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border x:Name="Root" Background="{TemplateBinding Background}" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{StaticResource DockHost.AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

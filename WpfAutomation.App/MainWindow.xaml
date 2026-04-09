@@ -1,0 +1,75 @@
+<Window x:Class="WpfAutomation.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:models="clr-namespace:WpfAutomation.App.Models"
+        xmlns:views="clr-namespace:WpfAutomation.App.Views"
+    xmlns:docking="clr-namespace:WpfAutomation.App.Docking.Controls"
+        xmlns:flowViews="clr-namespace:WpfAutomation.App.Views"
+        mc:Ignorable="d"
+        Title="Automation Platform Control Plane"
+        Topmost="False"
+        Height="560"
+        Width="920"
+        MinHeight="480"
+        MinWidth="760"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        Icon="Assets/Icons/AppIcon.png">
+    <Window.Resources>
+        <DataTemplate x:Key="ActionPanelTemplate" DataType="{x:Type models:UiActionCategory}">
+            <views:ActionBrowser CategoriesSource="{Binding DataContext.FilteredActionCategories, RelativeSource={RelativeSource AncestorType=Window}}"
+                                SearchText="{Binding DataContext.ActionSearchText, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                ExpandedCategoryIds="{Binding DataContext.ExpandedCategoryIds, RelativeSource={RelativeSource AncestorType=Window}}"
+                                SelectedAction="{Binding DataContext.SelectedSidebarAction, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"
+                                InvokeActionCommand="{Binding DataContext.InvokeActionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToggleCategoryCommand="{Binding DataContext.ToggleCategoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                StartDragCommand="{Binding DataContext.StartDragCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="CanvasDocumentTemplate">
+            <flowViews:FlowCanvasView DataContext="{Binding DataContext.FlowCanvas, RelativeSource={RelativeSource AncestorType=Window}}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="NodeInspectorTemplate">
+            <views:NodeInspectorView DataContext="{Binding DataContext.FlowCanvas, RelativeSource={RelativeSource AncestorType=Window}}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="EmptyToolTemplate">
+            <Border Background="Transparent" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="DefaultPanelTemplate">
+            <Border Margin="8" Padding="8">
+                <TextBlock Text="{Binding ContentKey}" />
+            </Border>
+        </DataTemplate>
+
+        <docking:DockPanelContentTemplateSelector x:Key="MainDockPanelContentTemplateSelector"
+                                                  ActionPanelTemplate="{StaticResource ActionPanelTemplate}"
+                                                  CanvasDocumentTemplate="{StaticResource CanvasDocumentTemplate}"
+                                                  NodeInspectorTemplate="{StaticResource NodeInspectorTemplate}"
+                                                  EmptyToolTemplate="{StaticResource EmptyToolTemplate}"
+                                                  DefaultTemplate="{StaticResource DefaultPanelTemplate}" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <docking:DockHost Grid.Row="0"
+                          x:Name="MainDockHost"
+                          PanelsSource="{Binding Panels}"
+                          ActiveLayout="{Binding ActiveLayout, Mode=TwoWay}"
+                          LayoutChangedCommand="{Binding LayoutChangedCommand}"
+                          PanelContentTemplateSelector="{StaticResource MainDockPanelContentTemplateSelector}" />
+
+        <views:StatusBarControl Grid.Row="1"
+                                Margin="0,12,0,0"
+                                ItemsSource="{Binding StatusBarItems}" />
+
+    </Grid>
+</Window>

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/WpfAutomation.Core.Tests/WpfAutomation.Core.Tests.csproj" />
+  </Folder>
+  <Project Path="AllItems.Automation.Browser/AllItems.Automation.Browser.csproj" />
+  <Project Path="WpfAutomation.App/WpfAutomation.App.csproj" />
+  <Project Path="WpfAutomation.Core/WpfAutomation.Core.csproj" />
+</Solution>
