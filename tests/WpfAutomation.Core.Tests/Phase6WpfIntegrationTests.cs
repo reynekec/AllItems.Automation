@@ -1,7 +1,9 @@
 using FluentAssertions;
 using WpfAutomation.App.Models;
 using WpfAutomation.App.Services;
+using WpfAutomation.App.Services.Flow;
 using WpfAutomation.App.ViewModels;
+using WpfAutomation.Core.Configuration;
 using WpfAutomation.Core.Abstractions;
 using WpfAutomation.Core.Diagnostics;
 
@@ -90,6 +92,36 @@ public sealed class Phase6WpfIntegrationTests
     }
 
     [Fact]
+    public async Task StartCommand_UsesCanvasFlow_WhenNodesExist()
+    {
+        var orchestrator = new FakeAutomationOrchestrator();
+        var diagnostics = new DiagnosticsService();
+        var flowCanvas = FlowCanvasViewModel.CreateDefault(diagnostics);
+        flowCanvas.HandleDrop(CreateRequest("open-browser"), new System.Windows.Point(20, 20));
+        var flowBridge = new FakeFlowExecutionBridge();
+        var viewModel = new MainViewModel(
+            orchestrator,
+            new FakeActionCatalogBuilder(),
+            diagnostics,
+            new ImmediateUiDispatcherService(),
+            new BrowserOptions(),
+            new FakeTestDockWindowService(),
+            flowCanvas,
+            dockLayoutPersistenceService: null,
+            flowBridge);
+
+        viewModel.Url = string.Empty;
+
+        viewModel.StartCommand.Execute(null);
+        await WaitForAsync(() => viewModel.IsRunning == false);
+
+        flowBridge.PrepareCalls.Should().Be(1);
+        orchestrator.RunCalls.Should().Be(0);
+        viewModel.RunState.Should().Be(UiRunState.Completed);
+        viewModel.Status.Should().Be("Completed");
+    }
+
+    [Fact]
     public void Canvas_DocumentWindow_Can_Hide_Its_Tab_Header()
     {
         var viewModel = new MainViewModel(new FakeAutomationOrchestrator(), new FakeActionCatalogBuilder(), new DiagnosticsService(), new ImmediateUiDispatcherService());
@@ -165,6 +197,13 @@ public sealed class Phase6WpfIntegrationTests
         }
     }
 
+    private sealed class FakeTestDockWindowService : ITestDockWindowService
+    {
+        public void Show()
+        {
+        }
+    }
+
     private sealed class FakeAutomationOrchestrator : IAutomationOrchestrator
     {
         public int RunCalls { get; private set; }
@@ -191,5 +230,36 @@ public sealed class Phase6WpfIntegrationTests
             CloseCalls++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeFlowExecutionBridge : IFlowExecutionBridge
+    {
+        public int PrepareCalls { get; private set; }
+
+        public int CloseCalls { get; private set; }
+
+        public Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default)
+        {
+            PrepareCalls++;
+            return Task.CompletedTask;
+        }
+
+        public Task CloseActiveSessionAsync()
+        {
+            CloseCalls++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private static UiActionDragRequest CreateRequest(string actionId)
+    {
+        return new UiActionDragRequest
+        {
+            ActionId = actionId,
+            ActionName = actionId,
+            CategoryId = "browser",
+            CategoryName = "Browser",
+            IsContainer = false,
+        };
     }
 }

@@ -28,6 +28,7 @@ public sealed class FlowExecutionMapper : IFlowDocumentMapper<ExecutionFlowGraph
                     DisplayLabel = actionNode.DisplayLabel,
                     NodeKind = actionNode.NodeKind,
                     ActionId = actionNode.ActionReference.ActionId,
+                    ActionParameters = actionNode.ActionParameters,
                     ContainerKind = null,
                     ContainerParameters = null,
                     ChildLanes = [],
@@ -42,6 +43,7 @@ public sealed class FlowExecutionMapper : IFlowDocumentMapper<ExecutionFlowGraph
                 DisplayLabel = containerNode.DisplayLabel,
                 NodeKind = containerNode.NodeKind,
                 ActionId = null,
+                ActionParameters = null,
                 ContainerKind = containerNode.ContainerKind,
                 ContainerParameters = containerNode.ContainerParameters,
                 ChildLanes = containerNode.ChildLanes
@@ -96,6 +98,8 @@ public sealed record ExecutionFlowNode : IExecutionFlowNode
     public FlowNodeKind NodeKind { get; init; }
 
     public string? ActionId { get; init; }
+
+    public ActionParameters? ActionParameters { get; init; }
 
     public FlowContainerKind? ContainerKind { get; init; }
 

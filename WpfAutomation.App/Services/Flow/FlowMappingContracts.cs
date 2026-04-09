@@ -29,6 +29,8 @@ public interface IExecutionFlowNode
 
     string? ActionId { get; }
 
+    ActionParameters? ActionParameters { get; }
+
     FlowContainerKind? ContainerKind { get; }
 
     ContainerParameters? ContainerParameters { get; }

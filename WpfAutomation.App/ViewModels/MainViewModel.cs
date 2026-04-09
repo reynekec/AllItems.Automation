@@ -21,6 +21,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private readonly IActionCatalogBuilder _actionCatalogBuilder;
     private readonly DiagnosticsService _diagnosticsService;
     private readonly BrowserOptions _browserOptions;
+    private readonly IFlowExecutionBridge _flowExecutionBridge;
     private readonly IUiDispatcherService _uiDispatcherService;
     private readonly ITestDockWindowService _testDockWindowService;
     private readonly IDockLayoutPersistenceService? _dockLayoutPersistenceService;
@@ -54,7 +55,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         IActionCatalogBuilder actionCatalogBuilder,
         DiagnosticsService diagnosticsService,
         IUiDispatcherService uiDispatcherService)
-        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, new BrowserOptions(), new NullTestDockWindowService(), FlowCanvasViewModel.CreateDefault(diagnosticsService), null)
+        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, new BrowserOptions(), new NullTestDockWindowService(), FlowCanvasViewModel.CreateDefault(diagnosticsService), null, new NullFlowExecutionBridge())
     {
     }
 
@@ -64,7 +65,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         DiagnosticsService diagnosticsService,
         IUiDispatcherService uiDispatcherService,
         ITestDockWindowService testDockWindowService)
-        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, new BrowserOptions(), testDockWindowService, FlowCanvasViewModel.CreateDefault(diagnosticsService), null)
+        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, new BrowserOptions(), testDockWindowService, FlowCanvasViewModel.CreateDefault(diagnosticsService), null, new NullFlowExecutionBridge())
     {
     }
 
@@ -75,7 +76,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         IUiDispatcherService uiDispatcherService,
         BrowserOptions browserOptions,
         ITestDockWindowService testDockWindowService)
-        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, browserOptions, testDockWindowService, FlowCanvasViewModel.CreateDefault(diagnosticsService), null)
+        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, browserOptions, testDockWindowService, FlowCanvasViewModel.CreateDefault(diagnosticsService), null, new NullFlowExecutionBridge())
     {
     }
 
@@ -88,7 +89,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         ITestDockWindowService testDockWindowService,
         IDockLayoutPersistenceService dockLayoutPersistenceService,
         FlowCanvasViewModel flowCanvasViewModel)
-        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, browserOptions, testDockWindowService, flowCanvasViewModel, dockLayoutPersistenceService)
+        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, browserOptions, testDockWindowService, flowCanvasViewModel, dockLayoutPersistenceService, new NullFlowExecutionBridge())
     {
     }
 
@@ -101,11 +102,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         ITestDockWindowService testDockWindowService,
         FlowCanvasViewModel flowCanvasViewModel,
         IDockLayoutPersistenceService? dockLayoutPersistenceService)
+        : this(orchestrator, actionCatalogBuilder, diagnosticsService, uiDispatcherService, browserOptions, testDockWindowService, flowCanvasViewModel, dockLayoutPersistenceService, new NullFlowExecutionBridge())
+    {
+    }
+
+    public MainViewModel(
+        IAutomationOrchestrator orchestrator,
+        IActionCatalogBuilder actionCatalogBuilder,
+        DiagnosticsService diagnosticsService,
+        IUiDispatcherService uiDispatcherService,
+        BrowserOptions browserOptions,
+        ITestDockWindowService testDockWindowService,
+        FlowCanvasViewModel flowCanvasViewModel,
+        IDockLayoutPersistenceService? dockLayoutPersistenceService,
+        IFlowExecutionBridge flowExecutionBridge)
     {
         _orchestrator = orchestrator;
         _actionCatalogBuilder = actionCatalogBuilder;
         _diagnosticsService = diagnosticsService;
         _browserOptions = browserOptions;
+        _flowExecutionBridge = flowExecutionBridge;
         _uiDispatcherService = uiDispatcherService;
         _testDockWindowService = testDockWindowService;
         _dockLayoutPersistenceService = dockLayoutPersistenceService;
@@ -390,7 +406,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
     private async Task ExecuteRunAsync(CancellationToken commandToken, bool debugMode)
     {
-        if (string.IsNullOrWhiteSpace(Url))
+        var hasAuthoredFlow = _flowCanvasViewModel.Document.Nodes.Count > 0;
+
+        if (!hasAuthoredFlow && string.IsNullOrWhiteSpace(Url))
         {
             SetStatus("Enter a valid URL", "$(warning)");
             return;
@@ -414,10 +432,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
             if (debugMode)
             {
-                _diagnosticsService.Info("Debug run requested; launching Chromium in headed mode.");
+                _diagnosticsService.Info(hasAuthoredFlow
+                    ? "Debug run requested; launching flow in headed mode."
+                    : "Debug run requested; launching Chromium in headed mode.");
             }
 
-            await _orchestrator.RunNavigationAsync(Url, _runCancellationTokenSource.Token);
+            if (hasAuthoredFlow)
+            {
+                var executionGraph = _flowCanvasViewModel.CreateExecutionGraph();
+                await _flowExecutionBridge.PrepareRunAsync(executionGraph, debugMode, _runCancellationTokenSource.Token);
+            }
+            else
+            {
+                await _orchestrator.RunNavigationAsync(Url, _runCancellationTokenSource.Token);
+            }
 
             RunState = UiRunState.Completed;
             SetStatus(debugMode ? "Debug session ready" : "Completed", "$(check)");
@@ -450,7 +478,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     {
         _runCancellationTokenSource?.Cancel();
         _diagnosticsService.Warn("Stop requested");
-        _ = _orchestrator.CloseActiveSessionAsync();
+        _ = CloseActiveRunsAsync();
     }
 
     private async void OnLogEntryAdded(LogEntry entry)
@@ -646,6 +674,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         foreach (var category in categories)
         {
             _actionCatalog.Add(category);
+        }
+    }
+
+    private async Task CloseActiveRunsAsync()
+    {
+        try
+        {
+            await Task.WhenAll(
+                _orchestrator.CloseActiveSessionAsync(),
+                _flowExecutionBridge.CloseActiveSessionAsync());
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsService.Error("Failed to close active automation sessions.", exception);
         }
     }
 

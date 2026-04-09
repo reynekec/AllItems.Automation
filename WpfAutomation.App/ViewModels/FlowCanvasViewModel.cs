@@ -197,6 +197,11 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
 
     public bool HasOpenedFile => !string.IsNullOrWhiteSpace(_currentDocumentPath);
 
+    public ExecutionFlowGraph CreateExecutionGraph()
+    {
+        return _executionMapper.Map(Document);
+    }
+
     public void HandleDrop(UiActionDragRequest request, Point dropPoint, FlowDropContextModel? dropContext = null)
     {
         var resolvedContext = dropContext ?? FlowDropContextModel.CreateRoot(dropPoint, InteractionState.HoveredEdgeId);
@@ -620,7 +625,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
     {
         try
         {
-            var graph = _executionMapper.Map(Document);
+            var graph = CreateExecutionGraph();
             _diagnosticsService.Info($"Flow runtime mapping ready. Nodes={graph.Nodes.Count}, Edges={graph.Edges.Count}.");
         }
         catch (Exception exception)

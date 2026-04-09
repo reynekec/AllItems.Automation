@@ -84,6 +84,59 @@ public sealed class BrowserLifecycleTests
     }
 
     [Fact]
+    public async Task StartAsync_DisablesViewportEmulation_ForHeadedSessions()
+    {
+        var mockPlaywright = new Mock<IPlaywright>();
+        var mockChromium = new Mock<IBrowserType>();
+        var mockBrowser = new Mock<IBrowser>();
+        var mockContext = new Mock<IBrowserContext>();
+
+        mockPlaywright.SetupGet(playwright => playwright.Chromium).Returns(mockChromium.Object);
+        mockChromium
+            .Setup(browser => browser.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .ReturnsAsync(mockBrowser.Object);
+        mockBrowser
+            .Setup(browser => browser.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
+            .ReturnsAsync(mockContext.Object);
+
+        var launcher = new BrowserLauncher(AppBrowserType.Chromium, () => Task.FromResult(mockPlaywright.Object), new DiagnosticsService());
+
+        _ = await launcher.StartAsync(new BrowserOptions { Headless = false });
+
+        mockBrowser.Verify(browser => browser.NewContextAsync(
+            It.Is<BrowserNewContextOptions>(options =>
+                options.ViewportSize != null &&
+                options.ViewportSize.Width == -1 &&
+                options.ViewportSize.Height == -1)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task StartAsync_KeepsDefaultViewportEmulation_ForHeadlessSessions()
+    {
+        var mockPlaywright = new Mock<IPlaywright>();
+        var mockChromium = new Mock<IBrowserType>();
+        var mockBrowser = new Mock<IBrowser>();
+        var mockContext = new Mock<IBrowserContext>();
+
+        mockPlaywright.SetupGet(playwright => playwright.Chromium).Returns(mockChromium.Object);
+        mockChromium
+            .Setup(browser => browser.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .ReturnsAsync(mockBrowser.Object);
+        mockBrowser
+            .Setup(browser => browser.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
+            .ReturnsAsync(mockContext.Object);
+
+        var launcher = new BrowserLauncher(AppBrowserType.Chromium, () => Task.FromResult(mockPlaywright.Object), new DiagnosticsService());
+
+        _ = await launcher.StartAsync(new BrowserOptions { Headless = true });
+
+        mockBrowser.Verify(browser => browser.NewContextAsync(
+            It.Is<BrowserNewContextOptions>(options => options.ViewportSize == null)),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task NewPageAsync_CreatesWrappedPage()
     {
         var mockPlaywright = new Mock<IPlaywright>();

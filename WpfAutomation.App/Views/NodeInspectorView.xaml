@@ -87,28 +87,41 @@
     </UserControl.Resources>
 
     <Border Padding="12">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <StackPanel>
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedNodeInspector.HasInspector}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
 
-            <TextBlock Grid.Row="0"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Text="{Binding SelectedNodeInspector.Title}" />
+                <TextBlock FontSize="16"
+                           FontWeight="SemiBold"
+                           Text="{Binding SelectedNodeInspector.Title}" />
 
-            <TextBlock Grid.Row="1"
-                       Margin="0,8,0,0"
-                       Foreground="#555"
-                       TextWrapping="Wrap"
-                       Text="{Binding SelectedNodeInspector.Message}" />
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="#555"
+                           TextWrapping="Wrap"
+                           Text="{Binding SelectedNodeInspector.Message}" />
+            </StackPanel>
 
-            <ContentControl Grid.Row="2"
-                            Margin="0,16,0,0"
-                            Content="{Binding SelectedNodeInspector.InspectorViewModel}"
-                            Visibility="{Binding SelectedNodeInspector.HasInspector, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        </Grid>
+            <ContentControl Content="{Binding SelectedNodeInspector.InspectorViewModel}"
+                            Visibility="{Binding SelectedNodeInspector.HasInspector, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Setter Property="Margin" Value="0,16,0,0" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedNodeInspector.HasInspector}" Value="True">
+                                <Setter Property="Margin" Value="0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
+        </StackPanel>
     </Border>
 </UserControl>

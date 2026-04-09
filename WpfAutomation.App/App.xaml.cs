@@ -59,7 +59,8 @@ public partial class App : Application
 		services.AddSingleton<IFlowLayoutService, FlowLayoutService>();
 		services.AddSingleton<IFlowDocumentMapper<ExecutionFlowGraph>, FlowExecutionMapper>();
 		services.AddSingleton<IFlowRuntimeExecutor, FlowRuntimeExecutor>();
-		services.AddSingleton<IFlowExecutionBridge, NullFlowExecutionBridge>();
+		services.AddSingleton<IBrowserLauncherFactory, BrowserLauncherFactory>();
+		services.AddSingleton<IFlowExecutionBridge, PlaywrightFlowExecutionBridge>();
 		services.AddSingleton<INodeInspectorRuntimeBindingExtension, NullNodeInspectorRuntimeBindingExtension>();
 		services.AddSingleton<INodeInspectorFactory, DefaultNodeInspectorFactory>();
 		services.AddSingleton<FlowCanvasViewModel>();

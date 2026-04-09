@@ -172,7 +172,7 @@
         <Style x:Key="DockGridSplitterStyle"
                TargetType="GridSplitter"
                BasedOn="{StaticResource DockHostSplitterStyle}">
-            <Setter Property="Background" Value="{StaticResource DockHost.SplitterBrush}" />
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="ShowsPreview" Value="True" />
             <Setter Property="ResizeBehavior" Value="PreviousAndNext" />
         </Style>
@@ -319,7 +319,12 @@
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Row="1" Grid.Column="2" Height="6" HorizontalAlignment="Stretch" Style="{StaticResource DockGridSplitterStyle}" />
+        <GridSplitter Grid.Row="1"
+                      Grid.Column="2"
+                      Height="6"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Rows"
+                      Style="{StaticResource DockGridSplitterStyle}" />
 
         <Grid Grid.Row="2" Grid.RowSpan="3" Grid.Column="0">
             <TabControl x:Name="LeftTabControl"
@@ -341,7 +346,13 @@
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Row="2" Grid.RowSpan="3" Grid.Column="1" Width="6" VerticalAlignment="Stretch" Style="{StaticResource DockGridSplitterStyle}" />
+        <GridSplitter Grid.Row="2"
+                      Grid.RowSpan="3"
+                      Grid.Column="1"
+                      Width="6"
+                      VerticalAlignment="Stretch"
+                      ResizeDirection="Columns"
+                      Style="{StaticResource DockGridSplitterStyle}" />
 
         <Grid Grid.Row="2" Grid.Column="2">
             <TabControl x:Name="CenterTabControl"
@@ -363,7 +374,13 @@
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Row="2" Grid.RowSpan="3" Grid.Column="3" Width="6" VerticalAlignment="Stretch" Style="{StaticResource DockGridSplitterStyle}" />
+        <GridSplitter Grid.Row="2"
+                      Grid.RowSpan="3"
+                      Grid.Column="3"
+                      Width="6"
+                      VerticalAlignment="Stretch"
+                      ResizeDirection="Columns"
+                      Style="{StaticResource DockGridSplitterStyle}" />
 
         <Grid Grid.Row="2" Grid.RowSpan="3" Grid.Column="4">
             <TabControl x:Name="RightTabControl"
@@ -393,7 +410,12 @@
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Row="3" Grid.Column="2" Height="6" HorizontalAlignment="Stretch" Style="{StaticResource DockGridSplitterStyle}" />
+        <GridSplitter Grid.Row="3"
+                      Grid.Column="2"
+                      Height="6"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Rows"
+                      Style="{StaticResource DockGridSplitterStyle}" />
 
         <Grid Grid.Row="4" Grid.Column="2">
             <TabControl x:Name="BottomTabControl"

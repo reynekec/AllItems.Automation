@@ -48,7 +48,14 @@ public sealed class BrowserLauncher : IBrowserLauncher
             });
             cancellationToken.ThrowIfCancellationRequested();
 
-            var context = await browser.NewContextAsync(new BrowserNewContextOptions());
+            var contextOptions = new BrowserNewContextOptions();
+            if (!options.Headless)
+            {
+                // Let the viewport follow the native window size for headed sessions.
+                contextOptions.ViewportSize = ViewportSize.NoViewport;
+            }
+
+            var context = await browser.NewContextAsync(contextOptions);
             _diagnosticsService.Info("Launch complete");
 
             return new BrowserSession(playwright, browser, context, options, _diagnosticsService);
