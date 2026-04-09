@@ -52,7 +52,9 @@ public sealed class PageWrapper : IPageWrapper
                 await _page.GotoAsync(parsedUri.ToString(), new PageGotoOptions
                 {
                     Timeout = _session.Options.TimeoutMs,
-                    WaitUntil = WaitUntilState.Load,
+                    WaitUntil = _session.Options.NavigationWaitUntilNetworkIdle
+                        ? WaitUntilState.NetworkIdle
+                        : WaitUntilState.Load,
                 });
             }, cancellationToken);
 

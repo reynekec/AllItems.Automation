@@ -249,6 +249,35 @@ public sealed class PageNavigationTests
     }
 
     [Fact]
+    public async Task NavigateUrlAsync_UsesNetworkIdleWaitState_WhenConfigured()
+    {
+        var mockPage = new Mock<IPage>();
+        var session = CreateSessionWithPage(mockPage, new BrowserOptions
+        {
+            TimeoutMs = 4321,
+            RetryCount = 0,
+            NavigationWaitUntilNetworkIdle = true,
+        });
+        var wrapper = new PageWrapper(mockPage.Object, session, new DiagnosticsService());
+
+        mockPage
+            .Setup(page => page.GotoAsync(
+                "https://example.com/",
+                It.Is<PageGotoOptions>(options =>
+                    options.Timeout == 4321 &&
+                    options.WaitUntil == WaitUntilState.NetworkIdle)))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        mockPage
+            .Setup(page => page.TitleAsync())
+            .ReturnsAsync("Example Domain");
+        mockPage
+            .SetupGet(page => page.Url)
+            .Returns("https://example.com/");
+
+        await wrapper.NavigateUrlAsync("https://example.com");
+    }
+
+    [Fact]
     public async Task NavigateUrlAsync_InvalidUrl_ThrowsNavigationException()
     {
         var mockPage = new Mock<IPage>();

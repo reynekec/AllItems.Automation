@@ -36,6 +36,56 @@
             <views:NodeInspectorView DataContext="{Binding DataContext.FlowCanvas, RelativeSource={RelativeSource AncestorType=Window}}" />
         </DataTemplate>
 
+        <DataTemplate x:Key="LogsPanelTemplate">
+            <Border Margin="8" Padding="8" Background="#FFF7F9FC" BorderBrush="#FFD6E0EA" BorderThickness="1" CornerRadius="6">
+                <ListBox ItemsSource="{Binding DataContext.Logs, RelativeSource={RelativeSource AncestorType=Window}}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:UiLogItem}">
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Margin="0,0,8,0"
+                                           Foreground="#FF5A6E81"
+                                           Text="{Binding TimestampUtc, StringFormat={}{0:HH:mm:ss}}" />
+                                <TextBlock Grid.Column="1"
+                                           Margin="0,0,8,0"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FF23415A"
+                                           Text="{Binding Level}" />
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                    <TextBlock Foreground="#FF5A6E81"
+                                               Text="{Binding ScreenshotPath}"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </Trigger>
+                                                    <Trigger Property="Text" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </DataTemplate>
+
         <DataTemplate x:Key="EmptyToolTemplate">
             <Border Background="Transparent" />
         </DataTemplate>
@@ -50,6 +100,7 @@
                                                   ActionPanelTemplate="{StaticResource ActionPanelTemplate}"
                                                   CanvasDocumentTemplate="{StaticResource CanvasDocumentTemplate}"
                                                   NodeInspectorTemplate="{StaticResource NodeInspectorTemplate}"
+                                                  LogsPanelTemplate="{StaticResource LogsPanelTemplate}"
                                                   EmptyToolTemplate="{StaticResource EmptyToolTemplate}"
                                                   DefaultTemplate="{StaticResource DefaultPanelTemplate}" />
     </Window.Resources>

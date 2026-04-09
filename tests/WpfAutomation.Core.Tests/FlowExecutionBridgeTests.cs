@@ -35,11 +35,12 @@ public sealed class FlowExecutionBridgeTests
     {
         var runtimeExecutor = new StubFlowRuntimeExecutor();
         var launcherFactory = new RecordingBrowserLauncherFactory();
+        var diagnostics = new DiagnosticsService();
         var bridge = new PlaywrightFlowExecutionBridge(
             runtimeExecutor,
             launcherFactory,
             new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 3 },
-            new DiagnosticsService());
+            diagnostics);
 
         var graph = new ExecutionFlowGraph
         {
@@ -66,6 +67,97 @@ public sealed class FlowExecutionBridgeTests
         launcherFactory.LastOptions!.Headless.Should().BeFalse();
         launcherFactory.LastOptions.TimeoutMs.Should().Be(1234);
         launcherFactory.LastOptions.RetryCount.Should().Be(2);
+        diagnostics.GetLogs().Should().Contain(entry => entry.Message.Contains("Flow action start."));
+        diagnostics.GetLogs().Should().Contain(entry => entry.Message.Contains("Flow action complete."));
+
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_Uses_ActionSpecific_Timeouts_For_Navigation_And_Click()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService());
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.GotoAsync(
+                "https://example.com/",
+                It.Is<PageGotoOptions>(options =>
+                    options.Timeout == 30000 &&
+                    options.WaitUntil == WaitUntilState.NetworkIdle)))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.TitleAsync())
+            .ReturnsAsync("Example");
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns("https://example.com/");
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.Locator(
+                "#cta",
+                It.IsAny<PageLocatorOptions>()))
+            .Returns(launcherFactory.LocatorMock.Object);
+        launcherFactory.LocatorMock
+            .Setup(candidate => candidate.ClickAsync(It.Is<LocatorClickOptions>(options => options.Timeout == 10000)))
+            .Returns(Task.CompletedTask);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-navigate",
+                    SourceNodeId = "navigate-node",
+                    DisplayLabel = "Navigate",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "navigate-to-url",
+                    ActionParameters = new NavigateToUrlActionParameters("https://example.com", 30000, true),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-click",
+                    SourceNodeId = "click-node",
+                    DisplayLabel = "Click",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "click-element",
+                    ActionParameters = new ClickElementActionParameters("#cta", null, false, 10000),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-navigate",
+                },
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-navigate",
+                    ToExecutionNodeId = "exec-click",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        launcherFactory.PageMock.VerifyAll();
+        launcherFactory.LocatorMock.VerifyAll();
 
         await bridge.CloseActiveSessionAsync();
     }
@@ -98,6 +190,10 @@ public sealed class FlowExecutionBridgeTests
 
         public BrowserOptions? LastOptions { get; set; }
 
+        public Mock<IPage> PageMock { get; } = new();
+
+        public Mock<ILocator> LocatorMock { get; } = new();
+
         public IBrowserLauncher Create(AppBrowserType browserType)
         {
             RequestedBrowserType = browserType;
@@ -121,26 +217,27 @@ public sealed class FlowExecutionBridgeTests
 
         public Task<BrowserSession> StartAsync(BrowserOptions options, CancellationToken cancellationToken = default)
         {
-            _factory.LastOptions = new BrowserOptions
+            var sessionOptions = new BrowserOptions
             {
                 Headless = options.Headless,
                 TimeoutMs = options.TimeoutMs,
                 RetryCount = options.RetryCount,
+                NavigationWaitUntilNetworkIdle = options.NavigationWaitUntilNetworkIdle,
                 ScreenshotDirectory = options.ScreenshotDirectory,
                 InspectionExportDirectory = options.InspectionExportDirectory,
             };
+            _factory.LastOptions = sessionOptions;
 
-            return Task.FromResult(CreateSession());
+            return Task.FromResult(CreateSession(sessionOptions));
         }
 
-        private static BrowserSession CreateSession()
+        private BrowserSession CreateSession(BrowserOptions options)
         {
             var playwright = new Mock<IPlaywright>();
             var browser = new Mock<IBrowser>();
             var context = new Mock<IBrowserContext>();
-            var page = new Mock<IPage>();
 
-            context.Setup(candidate => candidate.NewPageAsync()).ReturnsAsync(page.Object);
+            context.Setup(candidate => candidate.NewPageAsync()).ReturnsAsync(_factory.PageMock.Object);
             context.Setup(candidate => candidate.CloseAsync(It.IsAny<BrowserContextCloseOptions>())).Returns(Task.CompletedTask);
             browser.Setup(candidate => candidate.CloseAsync(It.IsAny<BrowserCloseOptions>())).Returns(Task.CompletedTask);
 
@@ -148,7 +245,7 @@ public sealed class FlowExecutionBridgeTests
                 playwright.Object,
                 browser.Object,
                 context.Object,
-                new BrowserOptions(),
+                options,
                 new DiagnosticsService());
         }
     }

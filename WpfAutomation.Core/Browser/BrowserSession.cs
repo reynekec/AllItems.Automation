@@ -52,6 +52,52 @@ public sealed class BrowserSession : IAsyncDisposable
         return Task.FromResult((IReadOnlyList<IPageWrapper>)wrappedPages);
     }
 
+    public Task WithTemporaryOptionsAsync(int? timeoutMs, bool? navigationWaitUntilNetworkIdle, Func<Task> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        return WithTemporaryOptionsAsync<object?>(
+            timeoutMs,
+            navigationWaitUntilNetworkIdle,
+            async () =>
+            {
+                await action();
+                return null;
+            });
+    }
+
+    public async Task<TResult> WithTemporaryOptionsAsync<TResult>(
+        int? timeoutMs,
+        bool? navigationWaitUntilNetworkIdle,
+        Func<Task<TResult>> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnsureOpen();
+
+        var originalTimeoutMs = _options.TimeoutMs;
+        var originalNavigationWaitUntilNetworkIdle = _options.NavigationWaitUntilNetworkIdle;
+
+        if (timeoutMs.HasValue)
+        {
+            _options.TimeoutMs = timeoutMs.Value;
+        }
+
+        if (navigationWaitUntilNetworkIdle.HasValue)
+        {
+            _options.NavigationWaitUntilNetworkIdle = navigationWaitUntilNetworkIdle.Value;
+        }
+
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            _options.TimeoutMs = originalTimeoutMs;
+            _options.NavigationWaitUntilNetworkIdle = originalNavigationWaitUntilNetworkIdle;
+        }
+    }
+
     public async Task CloseAsync()
     {
         if (_isClosed)

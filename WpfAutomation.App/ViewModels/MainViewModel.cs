@@ -429,6 +429,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
             IsRunning = true;
             RunState = UiRunState.Running;
             SetStatus(debugMode ? "Debugging" : "Running", "$(sync~spin)");
+            _diagnosticsService.Info(debugMode ? "Debug run started." : "Run started.", new Dictionary<string, string>
+            {
+                ["usesFlowCanvas"] = hasAuthoredFlow.ToString(),
+                ["targetUrl"] = Url,
+            });
 
             if (debugMode)
             {
@@ -449,16 +454,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
             RunState = UiRunState.Completed;
             SetStatus(debugMode ? "Debug session ready" : "Completed", "$(check)");
+            _diagnosticsService.Info(debugMode ? "Debug run completed." : "Run completed.");
         }
         catch (OperationCanceledException)
         {
             RunState = UiRunState.Cancelled;
             SetStatus(debugMode ? "Debug cancelled" : "Cancelled", "$(circle-slash)");
+            _diagnosticsService.Warn(debugMode ? "Debug run cancelled." : "Run cancelled.");
         }
         catch (Exception exception)
         {
             RunState = UiRunState.Failed;
             SetStatus($"Failed: {exception.Message}", "$(error)");
+            _diagnosticsService.Error(debugMode ? "Debug run failed." : "Run failed.", exception);
         }
         finally
         {

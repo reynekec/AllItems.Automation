@@ -12,6 +12,8 @@ public sealed class BrowserOptions
     [Range(0, 10)]
     public int RetryCount { get; set; } = 3;
 
+    public bool NavigationWaitUntilNetworkIdle { get; set; }
+
     public string? ScreenshotDirectory { get; set; }
 
     public string? InspectionExportDirectory { get; set; }

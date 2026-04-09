@@ -42,6 +42,21 @@ public sealed class Phase6WpfIntegrationTests
     }
 
     [Fact]
+    public async Task StartCommand_Writes_RunLifecycle_Logs_To_Ui()
+    {
+        var orchestrator = new FakeAutomationOrchestrator();
+        var diagnostics = new DiagnosticsService();
+        var viewModel = new MainViewModel(orchestrator, new FakeActionCatalogBuilder(), diagnostics, new ImmediateUiDispatcherService());
+        viewModel.Url = "https://example.com";
+
+        viewModel.StartCommand.Execute(null);
+        await WaitForAsync(() => viewModel.IsRunning == false);
+
+        viewModel.Logs.Should().Contain(log => log.Message.Contains("Run started."));
+        viewModel.Logs.Should().Contain(log => log.Message.Contains("Run completed."));
+    }
+
+    [Fact]
     public async Task StopCommand_Cancels_Execution_From_Ui()
     {
         var orchestrator = new FakeAutomationOrchestrator

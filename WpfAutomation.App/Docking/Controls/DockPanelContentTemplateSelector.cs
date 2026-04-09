@@ -14,6 +14,8 @@ public sealed class DockPanelContentTemplateSelector : DataTemplateSelector
 
     public DataTemplate? EmptyToolTemplate { get; init; }
 
+    public DataTemplate? LogsPanelTemplate { get; init; }
+
     public DataTemplate? DefaultTemplate { get; init; }
 
     public override DataTemplate? SelectTemplate(object item, DependencyObject container)
@@ -29,7 +31,7 @@ public sealed class DockPanelContentTemplateSelector : DataTemplateSelector
             "canvas" => CanvasDocumentTemplate ?? DefaultTemplate,
             "runner-controls" => NodeInspectorTemplate ?? DefaultTemplate,
             "errors" => EmptyToolTemplate ?? DefaultTemplate,
-            "logs" => EmptyToolTemplate ?? DefaultTemplate,
+            "logs" => LogsPanelTemplate ?? DefaultTemplate,
             _ => DefaultTemplate,
         };
     }

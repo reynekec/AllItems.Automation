@@ -40,6 +40,13 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         var runtimeResult = await _runtimeExecutor.ExecuteAsync(executionGraph, cancellationToken);
         var nodesBySourceId = executionGraph.Nodes.ToDictionary(node => node.SourceNodeId, StringComparer.Ordinal);
 
+        _diagnosticsService.Info("Flow run start.", new Dictionary<string, string>
+        {
+            ["nodeCount"] = executionGraph.Nodes.Count.ToString(),
+            ["edgeCount"] = executionGraph.Edges.Count.ToString(),
+            ["executedActionCount"] = runtimeResult.ExecutedNodeIds.Count.ToString(),
+        });
+
         foreach (var sourceNodeId in runtimeResult.ExecutedNodeIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -49,8 +56,27 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
                 continue;
             }
 
-            await ExecuteActionAsync(node, forceHeaded, cancellationToken);
+            var context = CreateNodeContext(node);
+            _diagnosticsService.Info("Flow action start.", context);
+
+            try
+            {
+                await ExecuteActionAsync(node, forceHeaded, cancellationToken);
+                _diagnosticsService.Info("Flow action complete.", context);
+            }
+            catch (OperationCanceledException)
+            {
+                _diagnosticsService.Warn("Flow action cancelled.", context);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _diagnosticsService.Error("Flow action failed.", exception, context);
+                throw;
+            }
         }
+
+        _diagnosticsService.Info("Flow run complete.");
     }
 
     public async Task CloseActiveSessionAsync()
@@ -153,7 +179,10 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
     private async Task NavigateToUrlAsync(NavigateToUrlActionParameters parameters, bool forceHeaded, CancellationToken cancellationToken)
     {
         var page = await EnsurePageAsync(forceHeaded, cancellationToken);
-        _currentPage = await page.NavigateUrlAsync(parameters.Url, cancellationToken);
+        _currentPage = await RequireActiveSession().WithTemporaryOptionsAsync(
+            parameters.TimeoutMs,
+            parameters.WaitUntilNetworkIdle,
+            () => page.NavigateUrlAsync(parameters.Url, cancellationToken));
     }
 
     private async Task ClickElementAsync(ClickElementActionParameters parameters, CancellationToken cancellationToken)
@@ -161,62 +190,94 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         EnsureUnsupportedParameter(string.IsNullOrWhiteSpace(parameters.FrameSelector), "click-element", "FrameSelector");
         EnsureUnsupportedParameter(!parameters.Force, "click-element", "Force");
 
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await element.ClickAsync(cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await element.ClickAsync(cancellationToken);
+        });
     }
 
     private async Task FillInputAsync(FillInputActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-
-        if (parameters.ClearFirst)
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
         {
-            await element.FillAsync(parameters.Value, cancellationToken);
-            return;
-        }
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
 
-        await element.TypeAsync(parameters.Value, cancellationToken);
+            if (parameters.ClearFirst)
+            {
+                await element.FillAsync(parameters.Value, cancellationToken);
+                return;
+            }
+
+            await element.TypeAsync(parameters.Value, cancellationToken);
+        });
     }
 
     private async Task HoverElementAsync(HoverElementActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await element.HoverAsync(cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await element.HoverAsync(cancellationToken);
+        });
     }
 
     private async Task SelectOptionAsync(SelectOptionActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await element.SelectAsync(parameters.OptionValue, cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await element.SelectAsync(parameters.OptionValue, cancellationToken);
+        });
     }
 
     private async Task ExpectEnabledAsync(ExpectEnabledActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await WaitUntilAsync(() => element.IsEnabledAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become enabled.", cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await WaitUntilAsync(() => element.IsEnabledAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become enabled.", cancellationToken);
+        });
     }
 
     private async Task ExpectHiddenAsync(ExpectHiddenActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await WaitUntilAsync(async () => !await element.IsVisibleAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become hidden.", cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await WaitUntilAsync(async () => !await element.IsVisibleAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become hidden.", cancellationToken);
+        });
     }
 
     private async Task ExpectTextAsync(ExpectTextActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await WaitUntilAsync(async () =>
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
         {
-            var text = await element.GetTextAsync(cancellationToken);
-            return string.Equals(text, parameters.ExpectedText,
-                parameters.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-        }, parameters.TimeoutMs, $"Element '{parameters.Selector}' text did not match the expected value.", cancellationToken);
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await WaitUntilAsync(async () =>
+            {
+                var text = await element.GetTextAsync(cancellationToken);
+                return string.Equals(text, parameters.ExpectedText,
+                    parameters.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+            }, parameters.TimeoutMs, $"Element '{parameters.Selector}' text did not match the expected value.", cancellationToken);
+        });
     }
 
     private async Task ExpectVisibleAsync(ExpectVisibleActionParameters parameters, CancellationToken cancellationToken)
     {
-        var element = (await RequirePageAsync(cancellationToken)).Search().ByCss(parameters.Selector, cancellationToken);
-        await WaitUntilAsync(() => element.IsVisibleAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become visible.", cancellationToken);
+        var page = await RequirePageAsync(cancellationToken);
+        await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
+        {
+            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
+            await WaitUntilAsync(() => element.IsVisibleAsync(cancellationToken), parameters.TimeoutMs, $"Element '{parameters.Selector}' did not become visible.", cancellationToken);
+        });
     }
 
     private async Task WaitForUrlAsync(WaitForUrlActionParameters parameters, CancellationToken cancellationToken)
@@ -259,11 +320,27 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         return await EnsurePageAsync(forceHeaded: false, cancellationToken);
     }
 
+    private BrowserSession RequireActiveSession()
+    {
+        return _activeSession
+            ?? throw new InvalidOperationException("Flow runtime requires an active browser session.");
+    }
+
     private static TParameters RequireParameters<TParameters>(IExecutionFlowNode node)
         where TParameters : ActionParameters
     {
         return node.ActionParameters as TParameters
             ?? throw new InvalidOperationException($"Action '{node.ActionId}' is missing typed parameters of '{typeof(TParameters).Name}'.");
+    }
+
+    private static Dictionary<string, string> CreateNodeContext(IExecutionFlowNode node)
+    {
+        return new Dictionary<string, string>
+        {
+            ["sourceNodeId"] = node.SourceNodeId,
+            ["actionId"] = node.ActionId ?? string.Empty,
+            ["displayLabel"] = node.DisplayLabel,
+        };
     }
 
     private static void EnsureUnsupportedParameter(bool condition, string actionId, string parameterName)
@@ -292,6 +369,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             Headless = forceHeaded ? false : _baseBrowserOptions.Headless,
             TimeoutMs = _baseBrowserOptions.TimeoutMs,
             RetryCount = _baseBrowserOptions.RetryCount,
+            NavigationWaitUntilNetworkIdle = _baseBrowserOptions.NavigationWaitUntilNetworkIdle,
             ScreenshotDirectory = _baseBrowserOptions.ScreenshotDirectory,
             InspectionExportDirectory = _baseBrowserOptions.InspectionExportDirectory,
         };
