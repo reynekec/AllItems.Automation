@@ -78,20 +78,9 @@ public sealed class FlowEditingService : IFlowEditingService
             if (hitEdge is not null)
             {
                 var sourceNode = nodes.FirstOrDefault(node => string.Equals(node.NodeId, hitEdge.FromNodeId, StringComparison.Ordinal));
-                if (sourceNode is not null)
+                if (sourceNode is not null && IsRootLane(targetLaneId!))
                 {
-                    nodes = nodes.Select(node =>
-                    {
-                        if (!string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
-                        {
-                            return node;
-                        }
-
-                        return node with
-                        {
-                            Bounds = node.Bounds with { X = sourceNode.Bounds.X },
-                        };
-                    }).ToList();
+                    nodes = CenterNodeUnderReference(nodes, nodeId, sourceNode);
                 }
 
                 edges.Remove(hitEdge);
@@ -129,11 +118,31 @@ public sealed class FlowEditingService : IFlowEditingService
             }
             else
             {
+                if (IsRootLane(targetLaneId!) && laneNodeIds.Count > 0)
+                {
+                    var previousNodeId = laneNodeIds[^1];
+                    var previousNode = nodes.FirstOrDefault(node => string.Equals(node.NodeId, previousNodeId, StringComparison.Ordinal));
+                    if (previousNode is not null)
+                    {
+                        nodes = CenterNodeUnderReference(nodes, nodeId, previousNode);
+                    }
+                }
+
                 AppendToLane(laneNodeIds, edges, nodeId, laneMetadata);
             }
         }
         else
         {
+            if (IsRootLane(targetLaneId!) && laneNodeIds.Count > 0)
+            {
+                var previousNodeId = laneNodeIds[^1];
+                var previousNode = nodes.FirstOrDefault(node => string.Equals(node.NodeId, previousNodeId, StringComparison.Ordinal));
+                if (previousNode is not null)
+                {
+                    nodes = CenterNodeUnderReference(nodes, nodeId, previousNode);
+                }
+            }
+
             AppendToLane(laneNodeIds, edges, nodeId, laneMetadata);
         }
 
@@ -168,6 +177,35 @@ public sealed class FlowEditingService : IFlowEditingService
         }
 
         laneNodeIds.Add(nodeId);
+    }
+
+    private static bool IsRootLane(string laneId)
+    {
+        return string.Equals(laneId, FlowLaneIdentifiers.RootLaneId, StringComparison.Ordinal);
+    }
+
+    private static List<FlowNodeModel> CenterNodeUnderReference(
+        List<FlowNodeModel> nodes,
+        string nodeId,
+        FlowNodeModel referenceNode)
+    {
+        var referenceCenterX = referenceNode.Bounds.X + (referenceNode.Bounds.Width / 2d);
+
+        return nodes.Select(node =>
+        {
+            if (!string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
+            {
+                return node;
+            }
+
+            return node with
+            {
+                Bounds = node.Bounds with
+                {
+                    X = referenceCenterX - (node.Bounds.Width / 2d),
+                },
+            };
+        }).ToList();
     }
 
     private static (FlowLaneModel RootLane, List<FlowNodeModel> Nodes) ApplyLaneNodeIds(
@@ -371,6 +409,12 @@ public sealed class FlowEditingService : IFlowEditingService
         if (rootNodeIds.Count > 0)
         {
             var predecessorId = rootNodeIds[^1];
+            var predecessor = nodes.FirstOrDefault(node => string.Equals(node.NodeId, predecessorId, StringComparison.Ordinal));
+            if (predecessor is not null)
+            {
+                nodes = CenterNodeUnderReference(nodes, containerId, predecessor);
+            }
+
             var edges = document.Edges.ToList();
             edges.Add(new FlowEdgeModel
             {

@@ -18,6 +18,7 @@ namespace WpfAutomation.App.ViewModels;
 
 public sealed class FlowCanvasViewModel : INotifyPropertyChanged
 {
+    private const string DefaultDocumentDisplayName = "Canvas Flow";
     private const long DuplicateDropWindowMilliseconds = 250;
     private const double AutoDropVerticalGap = 28;
     private const double ActionNodeDefaultWidth = 380;
@@ -65,15 +66,11 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         _executionMapper = executionMapper;
         _nodeInspectorFactory = nodeInspectorFactory;
 
-        _document = _editingService.CreateEmptyDocument("Canvas Flow");
+        _document = CreateEmptyDocument();
         EdgeVisuals = [];
         RefreshEdgeVisuals();
 
-        AddGroupContainerCommand = new RelayCommand(() => AddContainer(FlowContainerKind.Group));
-        AddForContainerCommand = new RelayCommand(() => AddContainer(FlowContainerKind.For));
-        AddForEachContainerCommand = new RelayCommand(() => AddContainer(FlowContainerKind.ForEach));
-        AddWhileContainerCommand = new RelayCommand(() => AddContainer(FlowContainerKind.While));
-        AddConditionContainerCommand = new RelayCommand(() => AddContainer(FlowContainerKind.Condition));
+        NewCommand = new RelayCommand(NewProject);
         ToggleCollapseCommand = new RelayCommand(ToggleCollapse, parameter => parameter is string);
         DeleteSelectionCommand = new RelayCommand(DeleteSelection, _ => HasSelection);
         CopySelectionCommand = new RelayCommand(CopySelection, _ => HasSelection);
@@ -174,15 +171,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
 
     public bool HasSelection => Document.Selection.SelectedNodeIds.Count > 0 || Document.Selection.SelectedEdgeIds.Count > 0;
 
-    public ICommand AddGroupContainerCommand { get; }
-
-    public ICommand AddForContainerCommand { get; }
-
-    public ICommand AddForEachContainerCommand { get; }
-
-    public ICommand AddWhileContainerCommand { get; }
-
-    public ICommand AddConditionContainerCommand { get; }
+    public ICommand NewCommand { get; }
 
     public ICommand ToggleCollapseCommand { get; }
 
@@ -396,10 +385,24 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         ClearHoverState();
     }
 
-    private void AddContainer(FlowContainerKind kind)
+    private FlowDocumentModel CreateEmptyDocument()
     {
-        var y = 60 + (Document.RootLane.NodeIds.Count * 120);
-        ApplyMutation(document => _editingService.AddContainerNode(document, kind, 64, y), $"Added {kind} container.");
+        return _editingService.CreateEmptyDocument(DefaultDocumentDisplayName);
+    }
+
+    private void NewProject(object? _)
+    {
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _clipboard = new FlowClipboardModel();
+        _lastDropSnapshot = null;
+        _lastCreatedNodeId = null;
+
+        SetCurrentDocumentPath(null);
+        Document = CreateEmptyDocument();
+        InteractionState = new FlowInteractionState();
+
+        _diagnosticsService.Info("Started a new empty project.");
     }
 
     private void ToggleCollapse(object? parameter)
@@ -940,7 +943,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
             ? (ContainerNodeDefaultWidth, ContainerNodeDefaultHeight)
             : (ActionNodeDefaultWidth, ActionNodeDefaultHeight);
 
-        var targetX = anchorNode.Bounds.X;
+        var targetX = anchorNode.Bounds.X + ((anchorNode.Bounds.Width - candidateWidth) / 2d);
         var targetY = anchorNode.Bounds.Y + anchorNode.Bounds.Height + AutoDropVerticalGap;
         var candidate = new Rect(targetX, targetY, candidateWidth, candidateHeight);
 

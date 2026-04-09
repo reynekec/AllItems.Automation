@@ -28,6 +28,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private readonly ObservableCollection<UiActionCategory> _actionCatalog;
     private readonly UiActionsSidebarState _actionsSidebarState;
     private readonly AsyncRelayCommand _startCommand;
+    private readonly AsyncRelayCommand _debugCommand;
     private readonly RelayCommand _stopCommand;
     private readonly RelayCommand _invokeActionCommand;
     private readonly RelayCommand _toggleCategoryCommand;
@@ -127,6 +128,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         }
 
         _startCommand = new AsyncRelayCommand(RunAsync, () => !IsRunning);
+        _debugCommand = new AsyncRelayCommand(DebugAsync, () => !IsRunning);
         _stopCommand = new RelayCommand(Stop, () => IsRunning);
         _invokeActionCommand = new RelayCommand(InvokeAction, parameter => parameter is UiActionInvokeRequest);
         _toggleCategoryCommand = new RelayCommand(ToggleCategory, parameter => parameter is UiActionCategoryToggleRequest);
@@ -135,6 +137,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         _layoutChangedCommand = new RelayCommand(parameter => OnDockLayoutChanged(parameter as DockLayoutSnapshot));
 
         StartCommand = _startCommand;
+        DebugCommand = _debugCommand;
         StopCommand = _stopCommand;
         InvokeActionCommand = _invokeActionCommand;
         ToggleCategoryCommand = _toggleCategoryCommand;
@@ -322,6 +325,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
     public ICommand StartCommand { get; }
 
+    public ICommand DebugCommand { get; }
+
     public ICommand StopCommand { get; }
 
     public ICommand InvokeActionCommand { get; }
@@ -375,6 +380,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
     private async Task RunAsync(CancellationToken commandToken)
     {
+        await ExecuteRunAsync(commandToken, debugMode: false);
+    }
+
+    private async Task DebugAsync(CancellationToken commandToken)
+    {
+        await ExecuteRunAsync(commandToken, debugMode: true);
+    }
+
+    private async Task ExecuteRunAsync(CancellationToken commandToken, bool debugMode)
+    {
         if (string.IsNullOrWhiteSpace(Url))
         {
             SetStatus("Enter a valid URL", "$(warning)");
@@ -383,22 +398,34 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
         _runCancellationTokenSource?.Dispose();
         _runCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(commandToken);
+        var originalHeadless = _browserOptions.Headless;
+
+        if (debugMode && originalHeadless)
+        {
+            _browserOptions.Headless = false;
+            UpdateExecutionProfileStatusItem();
+        }
 
         try
         {
             IsRunning = true;
             RunState = UiRunState.Running;
-            SetStatus("Running", "$(sync~spin)");
+            SetStatus(debugMode ? "Debugging" : "Running", "$(sync~spin)");
+
+            if (debugMode)
+            {
+                _diagnosticsService.Info("Debug run requested; launching Chromium in headed mode.");
+            }
 
             await _orchestrator.RunNavigationAsync(Url, _runCancellationTokenSource.Token);
 
             RunState = UiRunState.Completed;
-            SetStatus("Completed", "$(check)");
+            SetStatus(debugMode ? "Debug session ready" : "Completed", "$(check)");
         }
         catch (OperationCanceledException)
         {
             RunState = UiRunState.Cancelled;
-            SetStatus("Cancelled", "$(circle-slash)");
+            SetStatus(debugMode ? "Debug cancelled" : "Cancelled", "$(circle-slash)");
         }
         catch (Exception exception)
         {
@@ -407,6 +434,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         }
         finally
         {
+            if (_browserOptions.Headless != originalHeadless)
+            {
+                _browserOptions.Headless = originalHeadless;
+                UpdateExecutionProfileStatusItem();
+            }
+
             IsRunning = false;
             _runCancellationTokenSource?.Dispose();
             _runCancellationTokenSource = null;
@@ -453,6 +486,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private void RaiseCommandStateChanged()
     {
         _startCommand.RaiseCanExecuteChanged();
+        _debugCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
         _stopStatusActionItem.IsEnabled = IsRunning;
     }
@@ -534,6 +568,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private void UpdateDiagnosticsCountStatusItem()
     {
         _diagnosticsCountStatusItem.Text = $"Logs {Logs.Count}";
+    }
+
+    private void UpdateExecutionProfileStatusItem()
+    {
+        _executionProfileStatusItem.Text = BuildExecutionProfileText();
+        _executionProfileStatusItem.ToolTip = BuildExecutionProfileTooltip();
     }
 
     private string BuildExecutionProfileText()

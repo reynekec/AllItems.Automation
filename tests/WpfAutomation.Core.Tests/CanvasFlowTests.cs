@@ -75,7 +75,7 @@ public sealed class CanvasFlowTests
     }
 
     [Fact]
-    public void AddActionNode_InsertOnEdge_AlignsInsertedNodeLeftToSourceNode()
+    public void AddActionNode_InsertContainerOnEdge_CentersInsertedNodeUnderSourceNode()
     {
         var service = new FlowEditingService();
         var document = service.CreateEmptyDocument();
@@ -88,14 +88,16 @@ public sealed class CanvasFlowTests
         var sourceBefore = document.Nodes.Single(node => node.NodeId == sourceNodeId);
         var edgeId = document.Edges.Single(edge => edge.FromNodeId == sourceNodeId && edge.ToNodeId == targetNodeId).EdgeId;
 
-        document = service.AddActionNode(document, CreateRequest("inserted"), 900, 120, edgeId);
+        document = service.AddActionNode(document, CreateRequest("inserted", isContainer: true), 900, 120, edgeId);
 
         var inserted = document.Nodes.Single(node => node.DisplayLabel == "inserted");
-        inserted.Bounds.X.Should().Be(sourceBefore.Bounds.X);
+        var sourceCenterX = sourceBefore.Bounds.X + (sourceBefore.Bounds.Width / 2d);
+        var insertedCenterX = inserted.Bounds.X + (inserted.Bounds.Width / 2d);
+        insertedCenterX.Should().Be(sourceCenterX);
     }
 
     [Fact]
-    public void AddActionNode_DropOnBlankArea_AlignsLeftToParentAndUsesDefaultGap()
+    public void AddActionNode_DropOnBlankArea_UsesDefaultGapForSameWidthNodes()
     {
         var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
 
@@ -107,6 +109,40 @@ public sealed class CanvasFlowTests
 
         second.Bounds.X.Should().Be(first.Bounds.X);
         second.Bounds.Y.Should().Be(first.Bounds.Y + first.Bounds.Height + 28);
+    }
+
+    [Fact]
+    public void AddActionNode_DropContainerOnBlankArea_CentersUnderPreviousRootNode()
+    {
+        var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
+
+        viewModel.HandleDrop(CreateRequest("first"), new Point(150, 50));
+        viewModel.HandleDrop(CreateRequest("group", isContainer: true), new Point(900, 900));
+
+        var first = viewModel.Nodes.Single(node => node.DisplayLabel == "first");
+        var container = viewModel.Nodes.Single(node => node.DisplayLabel == "group");
+
+        var firstCenterX = first.Bounds.X + (first.Bounds.Width / 2d);
+        var containerCenterX = container.Bounds.X + (container.Bounds.Width / 2d);
+        containerCenterX.Should().Be(firstCenterX);
+        container.Bounds.Y.Should().Be(first.Bounds.Y + first.Bounds.Height + 28);
+    }
+
+    [Fact]
+    public void AddContainerNode_AppendsCenteredUnderPreviousRootNode()
+    {
+        var service = new FlowEditingService();
+        var document = service.CreateEmptyDocument();
+
+        document = service.AddActionNode(document, CreateRequest("first"), 80, 20);
+        document = service.AddContainerNode(document, FlowContainerKind.Group, 900, 240);
+
+        var first = document.Nodes.Single(node => node.DisplayLabel == "first");
+        var container = document.Nodes.OfType<FlowContainerNodeModel>().Single();
+
+        var firstCenterX = first.Bounds.X + (first.Bounds.Width / 2d);
+        var containerCenterX = container.Bounds.X + (container.Bounds.Width / 2d);
+        containerCenterX.Should().Be(firstCenterX);
     }
 
     [Fact]
@@ -279,6 +315,35 @@ public sealed class CanvasFlowTests
     }
 
     [Fact]
+    public void ViewModel_NewCommand_ResetsCanvasStateAndAllowsFreshDrop()
+    {
+        var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
+        var point = new Point(120, 180);
+        var request = CreateRequest("expect-text");
+
+        viewModel.HandleDrop(request, point);
+        viewModel.HandleDrop(CreateRequest("second"), new Point(120, 260));
+        viewModel.SetSelection([viewModel.Document.RootLane.NodeIds[0]], []);
+        viewModel.CopySelectionCommand.Execute(null);
+
+        viewModel.NewCommand.Execute(null);
+
+        viewModel.Nodes.Should().BeEmpty();
+        viewModel.Document.RootLane.NodeIds.Should().BeEmpty();
+        viewModel.EdgeVisuals.Should().BeEmpty();
+        viewModel.HasSelection.Should().BeFalse();
+        viewModel.InteractionState.SelectedNodeIds.Should().BeEmpty();
+        viewModel.InteractionState.SelectedEdgeIds.Should().BeEmpty();
+        viewModel.PasteSelectionCommand.CanExecute(null).Should().BeFalse();
+        viewModel.UndoCommand.CanExecute(null).Should().BeFalse();
+        viewModel.RedoCommand.CanExecute(null).Should().BeFalse();
+
+        viewModel.HandleDrop(request, point);
+
+        viewModel.Nodes.Should().HaveCount(1);
+    }
+
+    [Fact]
     public void ViewModel_DoesNotIgnoreDrop_WhenOnlyContainerFlagDiffers()
     {
         var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
@@ -367,7 +432,7 @@ public sealed class CanvasFlowTests
     }
 
     [Fact]
-    public void AutoLayout_AssignsUniformWidthAcrossRootLaneNodes()
+    public void AutoLayout_PreservesRootLaneWidthsAndCentersNodes()
     {
         var editing = new FlowEditingService();
         var layout = new FlowLayoutService();
@@ -377,14 +442,94 @@ public sealed class CanvasFlowTests
         document = editing.AddContainerNode(document, FlowContainerKind.Group, 320, 120);
         document = editing.AddActionNode(document, CreateRequest("third"), 20, 260);
 
-        var laidOut = layout.AutoLayout(layout.Recalculate(document));
-        var rootLaneWidths = laidOut.RootLane.NodeIds
-            .Select(nodeId => laidOut.Nodes.Single(node => node.NodeId == nodeId).Bounds.Width)
+        var laidOut = layout.Recalculate(layout.AutoLayout(layout.Recalculate(document)));
+        var rootNodes = laidOut.RootLane.NodeIds
+            .Select(nodeId => laidOut.Nodes.Single(node => node.NodeId == nodeId))
+            .ToList();
+
+        rootNodes.Select(node => node.Bounds.Width).Should().Equal(380, 420, 380);
+
+        var centers = rootNodes
+            .Select(node => node.Bounds.X + (node.Bounds.Width / 2d))
             .Distinct()
             .ToList();
 
-        rootLaneWidths.Should().ContainSingle();
-        rootLaneWidths[0].Should().Be(420);
+        centers.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void AutoLayout_Recalculate_PreservesNestedNodeWidthsAndCentersNodes()
+    {
+        var editing = new FlowEditingService();
+        var layout = new FlowLayoutService();
+
+        var document = editing.CreateEmptyDocument();
+        document = editing.AddContainerNode(document, FlowContainerKind.Group, 20, 20);
+
+        var container = document.Nodes.OfType<FlowContainerNodeModel>().Single();
+        var lane = container.ChildLanes.Single();
+
+        document = editing.AddActionNode(document, CreateRequest("child-action"), 80, 100, dropContext: new FlowDropContextModel { DropPoint = new Point(80, 100), TargetLaneId = lane.LaneId, TargetContainerNodeId = container.NodeId });
+        document = editing.AddActionNode(document, CreateRequest("child-container", isContainer: true), 80, 180, dropContext: new FlowDropContextModel { DropPoint = new Point(80, 180), TargetLaneId = lane.LaneId, TargetContainerNodeId = container.NodeId });
+
+        var preparedNodes = document.Nodes.Select(node =>
+        {
+            if (node is FlowContainerNodeModel group && string.Equals(group.NodeId, container.NodeId, StringComparison.Ordinal))
+            {
+                return (FlowNodeModel)(group with
+                {
+                    Bounds = group.Bounds with { Width = 640 },
+                });
+            }
+
+            return node.DisplayLabel switch
+            {
+                "child-action" => node with { Bounds = node.Bounds with { Width = 260 } },
+                "child-container" => node with { Bounds = node.Bounds with { Width = 340 } },
+                _ => node,
+            };
+        }).ToList();
+
+        document = document with { Nodes = preparedNodes };
+
+        var laidOut = layout.Recalculate(layout.AutoLayout(document));
+        var updatedContainer = laidOut.Nodes.OfType<FlowContainerNodeModel>().Single(node => string.Equals(node.NodeId, container.NodeId, StringComparison.Ordinal));
+        var childNodes = updatedContainer.ChildLanes.Single().NodeIds
+            .Select(nodeId => laidOut.Nodes.Single(node => string.Equals(node.NodeId, nodeId, StringComparison.Ordinal)))
+            .ToList();
+
+        childNodes.Select(node => node.Bounds.Width).Should().Equal(260, 340);
+
+        var centers = childNodes
+            .Select(node => node.Bounds.X + (node.Bounds.Width / 2d))
+            .Distinct()
+            .ToList();
+
+        centers.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ViewModel_AutoLayoutCommand_PreservesRootWidthsAndCentersNodes()
+    {
+        var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
+
+        viewModel.HandleDrop(CreateRequest("open browser"), new Point(40, 40));
+        viewModel.HandleDrop(CreateRequest("for-loop", isContainer: true), new Point(40, 220));
+
+        viewModel.AutoLayoutCommand.Execute(null);
+
+        var rootNodes = viewModel.Document.RootLane.NodeIds
+            .Select(nodeId => viewModel.Document.Nodes.Single(node => string.Equals(node.NodeId, nodeId, StringComparison.Ordinal)))
+            .ToList();
+
+        rootNodes.Select(node => node.Bounds.Width).Should().Equal(380, 420);
+
+        var centers = rootNodes
+            .Select(node => node.Bounds.X + (node.Bounds.Width / 2d))
+            .Distinct()
+            .ToList();
+
+        centers.Should().ContainSingle();
     }
 
     [Fact]
@@ -438,20 +583,6 @@ public sealed class CanvasFlowTests
 
         var map = () => mapper.Map(brokenCondition);
         map.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void ToolbarCommands_StillCreateContainerNodes()
-    {
-        var viewModel = FlowCanvasViewModel.CreateDefault(new DiagnosticsService());
-
-        viewModel.AddGroupContainerCommand.Execute(null);
-        viewModel.AddForContainerCommand.Execute(null);
-        viewModel.AddForEachContainerCommand.Execute(null);
-        viewModel.AddWhileContainerCommand.Execute(null);
-        viewModel.AddConditionContainerCommand.Execute(null);
-
-        viewModel.Nodes.OfType<FlowContainerNodeModel>().Should().HaveCount(5);
     }
 
     [Fact]

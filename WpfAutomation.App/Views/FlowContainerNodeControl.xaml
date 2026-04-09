@@ -13,6 +13,13 @@
         <SolidColorBrush x:Key="Flow.ActionBorder" Color="#FFD5DDE8" />
         <SolidColorBrush x:Key="Flow.ContainerFill" Color="#FFF7FAFD" />
         <SolidColorBrush x:Key="Flow.LaneFill" Color="#FFF3F6FA" />
+        <SolidColorBrush x:Key="Flow.ContainerText" Color="#FF354D66" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleBorder" Color="#FFD2DCE7" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleHoverBorder" Color="#FFB9C9D9" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleHoverFill" Color="#EEF4FA" />
+        <SolidColorBrush x:Key="Flow.ContainerTogglePressedFill" Color="#DFEAF4" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleIcon" Color="#FF50697F" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleIconHover" Color="#FF2E4A63" />
 
         <Style x:Key="FlowSelectionAwareBorderStyle" TargetType="Border">
             <Setter Property="BorderBrush" Value="{StaticResource Flow.ActionBorder}" />
@@ -36,6 +43,75 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="FlowContainerToggleButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource Flow.ContainerToggleBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Path x:Name="CollapsedChevron"
+                                      Width="10"
+                                      Height="10"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{StaticResource Flow.ContainerToggleIcon}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M 3,2 L 7.5,6 L 3,10" />
+                                <Path x:Name="ExpandedChevron"
+                                      Width="10"
+                                      Height="10"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{StaticResource Flow.ContainerToggleIcon}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M 2,3 L 6,7.5 L 10,3"
+                                      Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                <Setter TargetName="CollapsedChevron" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="ExpandedChevron" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{StaticResource Flow.ContainerToggleHoverFill}" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource Flow.ContainerToggleHoverBorder}" />
+                                <Setter TargetName="CollapsedChevron" Property="Stroke" Value="{StaticResource Flow.ContainerToggleIconHover}" />
+                                <Setter TargetName="ExpandedChevron" Property="Stroke" Value="{StaticResource Flow.ContainerToggleIconHover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{StaticResource Flow.ContainerTogglePressedFill}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Border Background="{StaticResource Flow.ContainerFill}" Style="{StaticResource FlowSelectionAwareBorderStyle}">
@@ -45,29 +121,26 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0">
-                <TextBlock Text="{Binding DisplayLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="#FF354D66" />
-                <Button Width="28"
-                        Height="22"
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding DisplayLabel}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource Flow.ContainerText}"
+                           TextTrimming="CharacterEllipsis" />
+
+                <Button Grid.Column="1"
                         Margin="8,0,0,0"
-                        HorizontalAlignment="Right"
-                    ClickMode="Press"
+                        ClickMode="Press"
+                        Style="{StaticResource FlowContainerToggleButtonStyle}"
                         Command="{Binding ToggleCollapseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding NodeId}">
-                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Foreground="#FF3C566F">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="^" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsExpanded}" Value="False">
-                                        <Setter Property="Text" Value="v" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Button>
-            </DockPanel>
+                        CommandParameter="{Binding NodeId}" />
+            </Grid>
 
             <ItemsControl Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding ChildLanes}"
                           Visibility="{Binding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">

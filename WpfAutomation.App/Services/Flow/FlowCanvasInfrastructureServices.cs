@@ -205,7 +205,7 @@ public sealed class FlowLayoutService : IFlowLayoutService
         var laneCursorY = container.Bounds.Y + ContainerHeaderHeight + LaneInsetTop;
         var laneVisualHeightTotal = 0d;
         var childNodeStartX = container.Bounds.X + LaneIndent;
-        var childNodeWidth = Math.Max(MinNestedNodeWidth, container.Bounds.Width - LaneIndent - ChildHorizontalInset);
+        var availableChildWidth = Math.Max(MinNestedNodeWidth, container.Bounds.Width - LaneIndent - ChildHorizontalInset);
         var updatedLanes = new List<FlowLaneModel>(container.ChildLanes.Count);
 
         foreach (var lane in container.ChildLanes.OrderBy(lane => lane.SortOrder))
@@ -221,13 +221,14 @@ public sealed class FlowLayoutService : IFlowLayoutService
                     continue;
                 }
 
+                var laneNodeWidth = ResolveNodeWidth(laneNode);
                 var normalizedLaneNode = laneNode with
                 {
                     Bounds = laneNode.Bounds with
                     {
-                        X = childNodeStartX,
+                        X = ResolveCenteredLaneX(childNodeStartX, availableChildWidth, laneNodeWidth),
                         Y = childCursorY,
-                        Width = childNodeWidth,
+                        Width = laneNodeWidth,
                         Height = laneNode.Bounds.Height > 0
                             ? laneNode.Bounds.Height
                             : (laneNode is FlowContainerNodeModel ? ContainerExpandedBase + ContainerLaneHeight : ActionDefaultHeight),
@@ -313,12 +314,14 @@ public sealed class FlowLayoutService : IFlowLayoutService
 
             if (node is FlowContainerNodeModel container)
             {
+                var containerWidth = ResolveNodeWidth(container);
+                var containerX = ResolveCenteredLaneX(startX, laneWidth, containerWidth);
                 var laneCursorY = cursorY + ContainerHeaderHeight + LaneInsetTop;
 
                 foreach (var lane in container.ChildLanes.OrderBy(lane => lane.SortOrder))
                 {
                     var laneStartY = laneCursorY + LaneHeaderHeight;
-                    var laneLayout = LayoutLane(lane.NodeIds, startX + LaneIndent, laneStartY, positionedNodes);
+                    var laneLayout = LayoutLane(lane.NodeIds, containerX + LaneIndent, laneStartY, positionedNodes);
                     var laneContentHeight = Math.Max(38, laneLayout.NextY - laneStartY);
                     laneCursorY = laneStartY + laneContentHeight + LaneGap;
                 }
@@ -331,32 +334,33 @@ public sealed class FlowLayoutService : IFlowLayoutService
                 {
                     Bounds = container.Bounds with
                     {
-                        X = startX,
+                        X = containerX,
                         Y = cursorY,
-                        Width = laneWidth,
+                        Width = containerWidth,
                         Height = containerHeight,
                     },
                 };
 
                 cursorY += containerHeight + VerticalGap;
-                maxWidth = Math.Max(maxWidth, laneWidth);
+                maxWidth = Math.Max(maxWidth, containerWidth);
                 continue;
             }
 
+            var width = ResolveNodeWidth(node);
             var height = node.Bounds.Height > 0 ? node.Bounds.Height : ActionDefaultHeight;
             positionedNodes[nodeId] = node with
             {
                 Bounds = node.Bounds with
                 {
-                    X = startX,
+                    X = ResolveCenteredLaneX(startX, laneWidth, width),
                     Y = cursorY,
-                    Width = laneWidth,
+                    Width = width,
                     Height = height,
                 },
             };
 
             cursorY += height + VerticalGap;
-            maxWidth = Math.Max(maxWidth, laneWidth);
+            maxWidth = Math.Max(maxWidth, width);
         }
 
         return new LaneLayoutResult(cursorY, maxWidth);
@@ -364,7 +368,7 @@ public sealed class FlowLayoutService : IFlowLayoutService
 
     private static double ResolveLaneWidth(IReadOnlyList<string> nodeIds, Dictionary<string, FlowNodeModel> positionedNodes)
     {
-        var laneWidth = Math.Max(ActionDefaultWidth, ContainerDefaultWidth);
+        var laneWidth = 0d;
 
         foreach (var nodeId in nodeIds)
         {
@@ -373,12 +377,21 @@ public sealed class FlowLayoutService : IFlowLayoutService
                 continue;
             }
 
-            var fallbackWidth = node is FlowContainerNodeModel ? ContainerDefaultWidth : ActionDefaultWidth;
-            var currentWidth = node.Bounds.Width > 0 ? node.Bounds.Width : fallbackWidth;
-            laneWidth = Math.Max(laneWidth, currentWidth);
+            laneWidth = Math.Max(laneWidth, ResolveNodeWidth(node));
         }
 
         return laneWidth;
+    }
+
+    private static double ResolveNodeWidth(FlowNodeModel node)
+    {
+        var fallbackWidth = node is FlowContainerNodeModel ? ContainerDefaultWidth : ActionDefaultWidth;
+        return node.Bounds.Width > 0 ? node.Bounds.Width : fallbackWidth;
+    }
+
+    private static double ResolveCenteredLaneX(double startX, double laneWidth, double nodeWidth)
+    {
+        return startX + Math.Max(0d, (laneWidth - nodeWidth) / 2d);
     }
 
     private readonly record struct LaneLayoutResult(double NextY, double MaxWidth);
