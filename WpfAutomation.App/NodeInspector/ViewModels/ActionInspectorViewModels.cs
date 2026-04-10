@@ -690,17 +690,20 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
     private void OpenCredentialManager()
     {
         AppCrashLogger.Info("NavigateToUrl inspector: open credential manager requested.");
-        var result = _credentialManagerDialogService.ShowDialog(selectedCredentialId: null, startWithNewCredential: true);
-        if (!result.Accepted || !result.SelectedCredentialId.HasValue || string.IsNullOrWhiteSpace(result.SelectedCredentialName))
+        var existingSelectionId = GetSelectedCredentialId();
+        var result = _credentialManagerDialogService.ShowDialog(selectedCredentialId: existingSelectionId, startWithNewCredential: true);
+
+        if (result.Accepted && result.SelectedCredentialId.HasValue && !string.IsNullOrWhiteSpace(result.SelectedCredentialName))
         {
-            AppCrashLogger.Info("NavigateToUrl inspector: credential selection canceled.");
+            AssignCredentialSelection(result.SelectedCredentialId.Value, result.SelectedCredentialName);
+            AppCrashLogger.Info("NavigateToUrl inspector: credential assigned.");
+            RefreshCredentialWarning();
+            _ = LoadCredentialOptionsAsync(result.SelectedCredentialId.Value);
             return;
         }
 
-        AssignCredentialSelection(result.SelectedCredentialId.Value, result.SelectedCredentialName);
-        AppCrashLogger.Info("NavigateToUrl inspector: credential assigned.");
-        RefreshCredentialWarning();
-        _ = LoadCredentialOptionsAsync(result.SelectedCredentialId.Value);
+        AppCrashLogger.Info("NavigateToUrl inspector: credential selection canceled.");
+        _ = LoadCredentialOptionsAsync(existingSelectionId);
     }
 
     private void ClearCredential()
@@ -1291,7 +1294,6 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
             SelectorById => BuildAttributeSelector("id", trimmed.TrimStart('#')),
             SelectorByClass => BuildClassSelector(trimmed),
             SelectorByName => BuildAttributeSelector("name", trimmed),
-            SelectorByTag => trimmed,
             _ => trimmed,
         };
     }
@@ -1334,8 +1336,394 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
 
 public sealed class FillInputInspectorViewModel : JsonActionInspectorViewModelBase<FillInputActionParameters>
 {
+    private const string SelectorById = "Id";
+    private const string SelectorByClass = "Class";
+    private const string SelectorByName = "Name";
+    private const string SelectorByTag = "Tag";
+    private const string SelectorByCss = "CSS";
+
+    private static readonly IReadOnlyList<string> TargetingModes =
+    [
+        SelectorById,
+        SelectorByClass,
+        SelectorByName,
+        SelectorByTag,
+        SelectorByCss,
+    ];
+
+    private static readonly Regex AttributeSelectorTokenPattern = new(
+        "^\\[(?<name>[A-Za-z_][A-Za-z0-9_-]*)\\s*(?<operator>~=|=)\\s*(?:\"(?<double>(?:\\\\.|[^\"])*)\"|'(?<single>(?:\\\\.|[^'])*)'|(?<bare>[^\\]]+))\\]",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SimpleIdSelectorPattern = new(
+        "^#(?<value>[^\\s>+~]+)$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SimpleClassSelectorPattern = new(
+        "^(?:\\.[^\\s>+~.#\\[:]+)+$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SimpleTagSelectorPattern = new(
+        "^[A-Za-z][A-Za-z0-9-]*$",
+        RegexOptions.Compiled);
+
+    private string _selectedSelectorMode = SelectorById;
+    private string _selectorInputValue = string.Empty;
+    private bool _isSynchronizingFromFields;
+
     public FillInputInspectorViewModel(FillInputActionParameters current, FillInputActionParameters defaults, Action<ActionParameters> commit)
-        : base("Fill input", "Target", "Configure input target and value.", null, current, defaults, commit) { }
+        : base("Fill input", "Target", "Configure input target and value.", null, current, defaults, commit)
+    {
+        PropertyChanged += HandlePropertyChanged;
+        SynchronizeFromFields();
+    }
+
+    public IReadOnlyList<string> SelectorModes => TargetingModes;
+
+    public string SelectedSelectorMode
+    {
+        get => _selectedSelectorMode;
+        set
+        {
+            if (string.Equals(_selectedSelectorMode, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _selectedSelectorMode = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectorInputLabel));
+            OnPropertyChanged(nameof(SelectorInputHelpText));
+            OnPropertyChanged(nameof(SelectorPreview));
+            UpdateSelectorField();
+        }
+    }
+
+    public string SelectorInputValue
+    {
+        get => _selectorInputValue;
+        set
+        {
+            if (string.Equals(_selectorInputValue, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _selectorInputValue = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectorPreview));
+            UpdateSelectorField();
+        }
+    }
+
+    public string SelectorInputLabel => SelectedSelectorMode switch
+    {
+        SelectorById => "Id",
+        SelectorByClass => "Class",
+        SelectorByName => "Name",
+        SelectorByTag => "Tag",
+        _ => "Selector",
+    };
+
+    public string SelectorInputHelpText => SelectedSelectorMode switch
+    {
+        SelectorById => "Enter the element id without the # prefix.",
+        SelectorByClass => "Enter one or more class names separated by spaces.",
+        SelectorByName => "Enter the name attribute value.",
+        SelectorByTag => "Enter the tag name, for example button or input.",
+        _ => "Enter a full CSS selector for advanced matching.",
+    };
+
+    public string SelectorPreview => string.IsNullOrWhiteSpace(BuildSelector(SelectedSelectorMode, SelectorInputValue))
+        ? "Select a target mode and enter a value."
+        : BuildSelector(SelectedSelectorMode, SelectorInputValue);
+
+    public string Value
+    {
+        get => FindField("Value").StringValue;
+        set
+        {
+            var field = FindField("Value");
+            if (string.Equals(field.StringValue, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            field.StringValue = value;
+        }
+    }
+
+    public bool ClearFirst
+    {
+        get => FindField("ClearFirst").BoolValue;
+        set
+        {
+            var field = FindField("ClearFirst");
+            if (field.BoolValue == value)
+            {
+                return;
+            }
+
+            field.BoolValue = value;
+        }
+    }
+
+    public string TimeoutMs
+    {
+        get => FindField("TimeoutMs").StringValue;
+        set
+        {
+            var field = FindField("TimeoutMs");
+            if (string.Equals(field.StringValue, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            field.StringValue = value;
+        }
+    }
+
+    private void HandlePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (!string.Equals(eventArgs.PropertyName, nameof(ParametersJson), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        SynchronizeFromFields();
+    }
+
+    private void SynchronizeFromFields()
+    {
+        _isSynchronizingFromFields = true;
+
+        try
+        {
+            var parsedSelector = ParseSelector(FindField("Selector").StringValue);
+            _selectedSelectorMode = parsedSelector.Mode;
+            _selectorInputValue = parsedSelector.Value;
+
+            OnPropertyChanged(nameof(SelectedSelectorMode));
+            OnPropertyChanged(nameof(SelectorInputValue));
+            OnPropertyChanged(nameof(SelectorInputLabel));
+            OnPropertyChanged(nameof(SelectorInputHelpText));
+            OnPropertyChanged(nameof(SelectorPreview));
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ClearFirst));
+            OnPropertyChanged(nameof(TimeoutMs));
+        }
+        finally
+        {
+            _isSynchronizingFromFields = false;
+        }
+    }
+
+    private void UpdateSelectorField()
+    {
+        if (_isSynchronizingFromFields)
+        {
+            return;
+        }
+
+        var field = FindField("Selector");
+        var selector = BuildSelector(SelectedSelectorMode, SelectorInputValue);
+        if (string.Equals(field.StringValue, selector, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        field.StringValue = selector;
+    }
+
+    private InspectorFieldViewModel FindField(string name)
+    {
+        return Fields.Single(field => string.Equals(field.Name, name, StringComparison.Ordinal));
+    }
+
+    private static (string Mode, string Value) ParseSelector(string selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector))
+        {
+            return (SelectorById, string.Empty);
+        }
+
+        var trimmed = selector.Trim();
+        if (TryParseAttributeSelector(trimmed, "id", "=", out var idValue))
+        {
+            return (SelectorById, idValue);
+        }
+
+        var idMatch = SimpleIdSelectorPattern.Match(trimmed);
+        if (idMatch.Success)
+        {
+            return (SelectorById, idMatch.Groups["value"].Value);
+        }
+
+        if (TryParseClassSelector(trimmed, out var classValue))
+        {
+            return (SelectorByClass, classValue);
+        }
+
+        if (TryParseAttributeSelector(trimmed, "name", "=", out var nameValue))
+        {
+            return (SelectorByName, nameValue);
+        }
+
+        if (SimpleTagSelectorPattern.IsMatch(trimmed))
+        {
+            return (SelectorByTag, trimmed);
+        }
+
+        return (SelectorByCss, trimmed);
+    }
+
+    private static bool TryParseClassSelector(string selector, out string classValue)
+    {
+        if (TryParseRepeatedAttributeSelectors(selector, "class", "~=", out var classTokens))
+        {
+            classValue = string.Join(" ", classTokens);
+            return true;
+        }
+
+        if (SimpleClassSelectorPattern.IsMatch(selector))
+        {
+            classValue = string.Join(" ", selector
+                .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return true;
+        }
+
+        classValue = string.Empty;
+        return false;
+    }
+
+    private static bool TryParseRepeatedAttributeSelectors(string selector, string attributeName, string attributeOperator, out IReadOnlyList<string> values)
+    {
+        values = [];
+        var remaining = selector.Trim();
+        var parsedValues = new List<string>();
+
+        while (remaining.Length > 0)
+        {
+            var match = AttributeSelectorTokenPattern.Match(remaining);
+            if (!match.Success)
+            {
+                values = [];
+                return false;
+            }
+
+            var name = match.Groups["name"].Value;
+            var selectorOperator = match.Groups["operator"].Value;
+            if (!string.Equals(name, attributeName, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(selectorOperator, attributeOperator, StringComparison.Ordinal))
+            {
+                values = [];
+                return false;
+            }
+
+            parsedValues.Add(UnescapeCssAttributeValue(ReadAttributeValue(match)));
+            remaining = remaining[match.Length..].TrimStart();
+        }
+
+        if (parsedValues.Count == 0)
+        {
+            values = [];
+            return false;
+        }
+
+        values = parsedValues;
+        return true;
+    }
+
+    private static bool TryParseAttributeSelector(string selector, string attributeName, string attributeOperator, out string value)
+    {
+        var trimmedSelector = selector.Trim();
+        var match = AttributeSelectorTokenPattern.Match(trimmedSelector);
+        if (!match.Success || match.Length != trimmedSelector.Length)
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        var name = match.Groups["name"].Value;
+        var selectorOperator = match.Groups["operator"].Value;
+        if (!string.Equals(name, attributeName, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(selectorOperator, attributeOperator, StringComparison.Ordinal))
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        value = UnescapeCssAttributeValue(ReadAttributeValue(match));
+        return true;
+    }
+
+    private static string ReadAttributeValue(Match match)
+    {
+        if (match.Groups["double"].Success)
+        {
+            return match.Groups["double"].Value;
+        }
+
+        if (match.Groups["single"].Success)
+        {
+            return match.Groups["single"].Value;
+        }
+
+        return match.Groups["bare"].Value.Trim();
+    }
+
+    private static string BuildSelector(string mode, string inputValue)
+    {
+        var trimmed = inputValue.Trim();
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return mode switch
+        {
+            SelectorById => BuildAttributeSelector("id", trimmed.TrimStart('#')),
+            SelectorByClass => BuildClassSelector(trimmed),
+            SelectorByName => BuildAttributeSelector("name", trimmed),
+            SelectorByTag => trimmed,
+            _ => trimmed,
+        };
+    }
+
+    private static string BuildClassSelector(string inputValue)
+    {
+        var classTokens = inputValue
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => token.TrimStart('.'))
+            .Where(token => token.Length > 0)
+            .ToArray();
+
+        if (classTokens.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Concat(classTokens.Select(token => $"[class~=\"{EscapeCssAttributeValue(token)}\"]"));
+    }
+
+    private static string BuildAttributeSelector(string attributeName, string attributeValue)
+    {
+        return $"[{attributeName}=\"{EscapeCssAttributeValue(attributeValue)}\"]";
+    }
+
+    private static string EscapeCssAttributeValue(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+    }
+
+    private static string UnescapeCssAttributeValue(string value)
+    {
+        return value
+            .Replace("\\\"", "\"", StringComparison.Ordinal)
+            .Replace("\\\\", "\\", StringComparison.Ordinal);
+    }
 }
 
 public sealed class HoverElementInspectorViewModel : JsonActionInspectorViewModelBase<HoverElementActionParameters>

@@ -11,25 +11,28 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
 {
     private readonly IFlowActionParameterResolver _parameterResolver;
     private readonly ICredentialManagerDialogService _credentialManagerDialogService;
+    private readonly IMasterPasswordService _masterPasswordService;
     private readonly ICredentialStore? _credentialStore;
 
     public DefaultNodeInspectorFactory()
-        : this(new FlowActionParameterResolver(), new NullCredentialManagerDialogService(), null)
+        : this(new FlowActionParameterResolver(), new NullCredentialManagerDialogService(), new NullMasterPasswordService())
     {
     }
 
     public DefaultNodeInspectorFactory(IFlowActionParameterResolver parameterResolver)
-        : this(parameterResolver, new NullCredentialManagerDialogService(), null)
+        : this(parameterResolver, new NullCredentialManagerDialogService(), new NullMasterPasswordService())
     {
     }
 
     public DefaultNodeInspectorFactory(
         IFlowActionParameterResolver parameterResolver,
         ICredentialManagerDialogService credentialManagerDialogService,
+        IMasterPasswordService masterPasswordService,
         ICredentialStore? credentialStore = null)
     {
         _parameterResolver = parameterResolver;
         _credentialManagerDialogService = credentialManagerDialogService;
+        _masterPasswordService = masterPasswordService;
         _credentialStore = credentialStore;
     }
 
@@ -51,6 +54,7 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
         // 2) Register default descriptor in FlowActionParameterResolver
         // 3) Add a dedicated view model + UserControl and map it below
         var actionId = node.ActionReference.ActionId;
+        PromptCredentialUnlockIfNeeded(actionId);
         var descriptor = _parameterResolver.Resolve(actionId);
         var defaults = descriptor.DefaultValue;
 
@@ -118,5 +122,20 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
         }
 
         return (TParameters)defaultValue;
+    }
+
+    private void PromptCredentialUnlockIfNeeded(string actionId)
+    {
+        if (!string.Equals(actionId, "navigate-to-url", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (_credentialStore is null || _credentialStore.IsUnlocked)
+        {
+            return;
+        }
+
+        _masterPasswordService.EnsureUnlockedBeforeRun();
     }
 }

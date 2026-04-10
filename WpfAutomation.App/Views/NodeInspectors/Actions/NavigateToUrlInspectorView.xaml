@@ -18,12 +18,6 @@
                 <TextBlock Style="{StaticResource NodeInspector.CategoryHeaderTextStyle}" Text="Authentication" />
                 <TextBlock Style="{StaticResource NodeInspector.HelpTextStyle}" Text="Select a credential to use when logging in to this page." />
 
-                <TextBox Margin="0,8,0,0"
-                         Text="{Binding CredentialSearchText, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource NodeInspector.TextBoxStyle}"
-                         IsEnabled="{Binding IsCredentialPickerEnabled}"
-                         ToolTip="Search credentials by name" />
-
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -33,12 +27,19 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <ComboBox Grid.Column="0"
+                    <ComboBox x:Name="CredentialPickerComboBox"
+                              Grid.Column="0"
                               ItemsSource="{Binding FilteredCredentialOptions}"
                               SelectedItem="{Binding SelectedCredentialOption, Mode=TwoWay}"
+                              Text="{Binding CredentialSearchText, Mode=OneWayToSource, UpdateSourceTrigger=PropertyChanged}"
                               DisplayMemberPath="DisplayText"
+                              IsEditable="True"
+                              IsTextSearchEnabled="False"
+                              StaysOpenOnEdit="True"
+                              GotKeyboardFocus="CredentialPickerComboBoxGotKeyboardFocus"
                               Style="{StaticResource NodeInspector.ComboBoxStyle}"
-                              IsEnabled="{Binding IsCredentialPickerEnabled}" />
+                              IsEnabled="{Binding IsCredentialPickerEnabled}"
+                              ToolTip="Type to filter credentials" />
 
                     <Button Grid.Column="2"
                             MinWidth="52"
