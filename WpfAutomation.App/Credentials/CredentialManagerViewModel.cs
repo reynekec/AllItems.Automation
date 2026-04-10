@@ -12,13 +12,15 @@ public sealed class CredentialManagerViewModel : INotifyPropertyChanged
 {
     private readonly ICredentialStore _credentialStore;
     private readonly Guid? _preselectedCredentialId;
+    private readonly bool _startWithNewCredential;
     private CredentialEntryViewModel? _selectedCredential;
     private string? _validationMessage;
 
-    public CredentialManagerViewModel(ICredentialStore credentialStore, Guid? preselectedCredentialId = null)
+    public CredentialManagerViewModel(ICredentialStore credentialStore, Guid? preselectedCredentialId = null, bool startWithNewCredential = false)
     {
         _credentialStore = credentialStore;
         _preselectedCredentialId = preselectedCredentialId;
+        _startWithNewCredential = startWithNewCredential;
 
         Credentials = [];
 
@@ -98,6 +100,12 @@ public sealed class CredentialManagerViewModel : INotifyPropertyChanged
         foreach (var entry in mapped)
         {
             Credentials.Add(entry);
+        }
+
+        if (_startWithNewCredential)
+        {
+            AddNew();
+            return;
         }
 
         if (Credentials.Count == 0)

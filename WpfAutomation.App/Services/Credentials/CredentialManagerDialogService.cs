@@ -1,7 +1,6 @@
 using System.Windows;
 using WpfAutomation.App.Credentials;
 using WpfAutomation.App.Services.Diagnostics;
-using WpfAutomation.App.Services;
 
 namespace WpfAutomation.App.Services.Credentials;
 
@@ -21,7 +20,7 @@ public sealed class CredentialManagerDialogService : ICredentialManagerDialogSer
         _uiDispatcherService = uiDispatcherService;
     }
 
-    public CredentialManagerDialogResult ShowDialog(Guid? selectedCredentialId = null)
+    public CredentialManagerDialogResult ShowDialog(Guid? selectedCredentialId = null, bool startWithNewCredential = false)
     {
         if (!_credentialStore.IsUnlocked)
         {
@@ -41,7 +40,7 @@ public sealed class CredentialManagerDialogService : ICredentialManagerDialogSer
             _uiDispatcherService.InvokeAsync(() =>
             {
                 AppCrashLogger.Info("Credential manager dialog opening.");
-                var viewModel = new CredentialManagerViewModel(_credentialStore, selectedCredentialId);
+                var viewModel = new CredentialManagerViewModel(_credentialStore, selectedCredentialId, startWithNewCredential);
                 var window = CreateWindow(viewModel);
 
                 var dialogResult = window.ShowDialog();

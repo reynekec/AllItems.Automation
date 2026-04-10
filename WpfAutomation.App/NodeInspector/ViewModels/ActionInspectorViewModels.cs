@@ -608,7 +608,7 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
         get => _credentialSearchText;
         set
         {
-            var next = value ?? string.Empty;
+            var next = value;
             if (string.Equals(_credentialSearchText, next, StringComparison.Ordinal))
             {
                 return;
