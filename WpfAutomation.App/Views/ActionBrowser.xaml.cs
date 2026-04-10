@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using WpfAutomation.App.Models;
 
 namespace WpfAutomation.App.Views;
@@ -48,7 +49,7 @@ public partial class ActionBrowser
             nameof(SelectedAction),
             typeof(UiActionItem),
             typeof(ActionBrowser),
-            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnSelectedActionChanged));
 
     public static readonly DependencyProperty InvokeActionCommandProperty =
         DependencyProperty.Register(
@@ -169,6 +170,16 @@ public partial class ActionBrowser
         control.RefreshFilteredCategories();
     }
 
+    private static void OnSelectedActionChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs eventArgs)
+    {
+        if (dependencyObject is not ActionBrowser control)
+        {
+            return;
+        }
+
+        control.SyncSelectedActionState();
+    }
+
     private void RefreshFilteredCategories()
     {
         var search = SearchText.Trim();
@@ -197,15 +208,65 @@ public partial class ActionBrowser
             return;
         }
 
-        FilteredCategoriesSource =
-        [
-            new UiActionCategory
+        var rootCategories = new List<UiActionCategory>();
+
+        var automationCategory = filtered.FirstOrDefault(category =>
+            string.Equals(category.CategoryId, "automation", StringComparison.OrdinalIgnoreCase));
+
+        if (automationCategory is not null)
+        {
+            rootCategories.Add(automationCategory);
+        }
+
+        var browserAutomationChildren = filtered
+            .Where(category => !string.Equals(category.CategoryId, "automation", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (browserAutomationChildren.Count > 0)
+        {
+            rootCategories.Add(new UiActionCategory
             {
                 CategoryId = BrowserAutomationRootCategoryId,
                 CategoryName = BrowserAutomationRootCategoryName,
-                ChildCategories = new ObservableCollection<UiActionCategory>(filtered),
-            },
-        ];
+                ChildCategories = new ObservableCollection<UiActionCategory>(browserAutomationChildren),
+            });
+        }
+
+        FilteredCategoriesSource = rootCategories;
+
+        SyncSelectedActionState();
+    }
+
+    private void SyncSelectedActionState()
+    {
+        var selected = SelectedAction;
+        foreach (var action in EnumerateActions(FilteredCategoriesSource ?? []))
+        {
+            action.IsSelected = selected is not null &&
+                                string.Equals(action.ActionId, selected.ActionId, StringComparison.Ordinal) &&
+                                string.Equals(action.CategoryId, selected.CategoryId, StringComparison.Ordinal);
+        }
+    }
+
+    private static IEnumerable<UiActionItem> EnumerateActions(IEnumerable<UiActionCategory> categories)
+    {
+        foreach (var category in categories)
+        {
+            if (category.ChildCategories.Count > 0)
+            {
+                foreach (var childAction in EnumerateActions(category.ChildCategories))
+                {
+                    yield return childAction;
+                }
+
+                continue;
+            }
+
+            foreach (var action in category.Actions)
+            {
+                yield return action;
+            }
+        }
     }
 
     private static bool MatchesSearch(UiActionItem action, string search)
@@ -230,7 +291,7 @@ public partial class ActionBrowser
             return;
         }
 
-        if (category.CategoryId == BrowserAutomationRootCategoryId)
+        if (string.Equals(category.CategoryId, BrowserAutomationRootCategoryId, StringComparison.Ordinal))
         {
             treeItem.IsExpanded = true;
             return;
@@ -261,7 +322,7 @@ public partial class ActionBrowser
             return;
         }
 
-        var treeItem = ItemsControl.ContainerFromElement(CategoryTree, source) as TreeViewItem;
+        var treeItem = FindAncestor<TreeViewItem>(source);
         if (treeItem?.DataContext is not UiActionCategory || !treeItem.HasItems)
         {
             return;
@@ -271,12 +332,30 @@ public partial class ActionBrowser
         eventArgs.Handled = true;
     }
 
+    private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
+    {
+        var current = start;
+        while (current is not null)
+        {
+            if (current is T typed)
+            {
+                return typed;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
     private void ActionInvokeButton_OnClick(object sender, RoutedEventArgs eventArgs)
     {
         if (sender is not Button { DataContext: UiActionItem action })
         {
             return;
         }
+
+        SelectedAction = action;
 
         var request = new UiActionInvokeRequest
         {

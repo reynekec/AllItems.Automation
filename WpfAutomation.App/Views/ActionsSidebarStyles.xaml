@@ -20,6 +20,8 @@
     <SolidColorBrush x:Key="ActionsSidebar.RowHoverBrush"           Color="#F0F6FF" />
     <SolidColorBrush x:Key="ActionsSidebar.ItemHoverBrush"          Color="#EEF4FC" />
     <SolidColorBrush x:Key="ActionsSidebar.ItemPressBrush"          Color="#D9E9F8" />
+    <SolidColorBrush x:Key="ActionsSidebar.ItemSelectedBrush"       Color="#E3F1FF" />
+    <SolidColorBrush x:Key="ActionsSidebar.ItemSelectedBorderBrush" Color="#0078D4" />
 
     <!-- ═══ Root ══════════════════════════════════════════════════════════ -->
     <Style x:Key="ActionsSidebarRootBorderStyle" TargetType="Border">
@@ -178,10 +180,10 @@
                             <Setter TargetName="Row" Property="Margin" Value="0,8,0,0" />
                         </Trigger>
 
-                        <!-- Expanded: show children, blue left accent, swap to down chevron -->
+                        <!-- Expanded: show children and swap to down chevron (no selected-like accent) -->
                         <Trigger Property="IsExpanded" Value="True">
                             <Setter TargetName="ChildItemsHost" Property="Visibility" Value="Visible" />
-                            <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource ActionsSidebar.AccentBrush}" />
+                            <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource ActionsSidebar.DividerBrush}" />
                             <Setter TargetName="ChevronRight" Property="Visibility" Value="Collapsed" />
                             <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible" />
                         </Trigger>
@@ -189,7 +191,7 @@
                         <!-- Category hover (only on rows that have children) -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsMouseDirectlyOver" Value="True" />
                                 <Condition Property="HasItems" Value="True" />
                             </MultiTrigger.Conditions>
                             <MultiTrigger.Setters>
@@ -227,12 +229,20 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" MinHeight="26">
+                    <Border x:Name="Bg"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="2,0,0,0"
+                            BorderBrush="Transparent"
+                            MinHeight="26">
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource ActionsSidebar.ItemSelectedBrush}" />
+                            <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource ActionsSidebar.ItemSelectedBorderBrush}" />
+                        </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource ActionsSidebar.ItemHoverBrush}" />
                         </Trigger>

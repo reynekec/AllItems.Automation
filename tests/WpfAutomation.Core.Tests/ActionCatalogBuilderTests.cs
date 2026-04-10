@@ -11,13 +11,14 @@ public sealed class ActionCatalogBuilderTests
     private const string ContainerCategoryId = "test-container";
 
     [Fact]
-    public void Build_WithBrowserAssembly_ReturnsFiveExpectedCategories()
+    public void Build_WithBrowserAssembly_ReturnsExpectedCategories()
     {
         var builder = new ActionCatalogBuilder();
 
         var categories = builder.Build([typeof(OpenBrowserAction).Assembly]);
 
-        categories.Should().HaveCount(5);
+        categories.Should().HaveCount(6);
+        categories.Should().ContainSingle(category => category.CategoryId == "automation" && category.Actions.Count == 1);
         categories.Should().ContainSingle(category => category.CategoryId == "browser" && category.Actions.Count == 3);
         categories.Should().ContainSingle(category => category.CategoryId == "navigation" && category.Actions.Count == 5);
         categories.Should().ContainSingle(category => category.CategoryId == "elements" && category.Actions.Count == 5);
@@ -56,8 +57,8 @@ public sealed class ActionCatalogBuilderTests
 
         var categories = builder.Build([browserAssembly, browserAssembly]);
 
-        categories.Should().HaveCount(5);
-        categories.SelectMany(category => category.Actions).Should().HaveCount(20);
+        categories.Should().HaveCount(6);
+        categories.SelectMany(category => category.Actions).Should().HaveCount(21);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public sealed class ActionCatalogBuilderTests
                 typeof(IAutomationAction).IsAssignableFrom(type))
             .ToList();
 
-        actionTypes.Should().HaveCount(20);
+        actionTypes.Should().HaveCount(21);
 
         var actionIds = actionTypes
             .Select(type => (IAutomationAction)Activator.CreateInstance(type)!)

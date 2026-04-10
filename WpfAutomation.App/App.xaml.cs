@@ -81,6 +81,7 @@ public partial class App : Application
 		services.AddSingleton<IFlowRuntimeExecutor, FlowRuntimeExecutor>();
 		services.AddSingleton<IBrowserLauncherFactory, BrowserLauncherFactory>();
 		services.AddSingleton<IWebAuthExecutor, WebAuthExecutor>();
+		services.AddSingleton<IUserConfirmationDialogService, UserConfirmationDialogService>();
 		services.AddSingleton<IFlowExecutionBridge, PlaywrightFlowExecutionBridge>();
 		services.AddSingleton<INodeInspectorRuntimeBindingExtension, NullNodeInspectorRuntimeBindingExtension>();
 		services.AddSingleton<INodeInspectorFactory, DefaultNodeInspectorFactory>();

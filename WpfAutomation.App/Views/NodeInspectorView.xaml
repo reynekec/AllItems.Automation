@@ -41,6 +41,9 @@
             <DataTemplate DataType="{x:Type vm:WaitForUrlInspectorViewModel}">
                 <actionViews:WaitForUrlInspectorView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:WaitForUserConfirmationInspectorViewModel}">
+                <actionViews:WaitForUserConfirmationInspectorView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vm:ClickElementInspectorViewModel}">
                 <actionViews:ClickElementInspectorView />
             </DataTemplate>

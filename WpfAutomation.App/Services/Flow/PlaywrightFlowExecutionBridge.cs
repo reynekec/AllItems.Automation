@@ -24,6 +24,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
     private readonly IMasterPasswordService _masterPasswordService;
     private readonly ICredentialStore? _credentialStore;
     private readonly IWebAuthExecutor _webAuthExecutor;
+    private readonly IUserConfirmationDialogService _userConfirmationDialogService;
     private BrowserType _activeBrowserType = BrowserType.Chromium;
     private BrowserSession? _activeSession;
     private IPageWrapper? _currentPage;
@@ -35,7 +36,8 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         DiagnosticsService diagnosticsService,
         IMasterPasswordService? masterPasswordService = null,
         ICredentialStore? credentialStore = null,
-        IWebAuthExecutor? webAuthExecutor = null)
+        IWebAuthExecutor? webAuthExecutor = null,
+        IUserConfirmationDialogService? userConfirmationDialogService = null)
     {
         _runtimeExecutor = runtimeExecutor;
         _browserLauncherFactory = browserLauncherFactory;
@@ -44,6 +46,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         _masterPasswordService = masterPasswordService ?? new NullMasterPasswordService();
         _credentialStore = credentialStore;
         _webAuthExecutor = webAuthExecutor ?? new NullWebAuthExecutor();
+        _userConfirmationDialogService = userConfirmationDialogService ?? new NullUserConfirmationDialogService();
     }
 
     public async Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default)
@@ -154,6 +157,9 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
                 return;
             case "wait-for-url":
                 await WaitForUrlAsync(RequireParameters<WaitForUrlActionParameters>(node), cancellationToken);
+                return;
+            case "wait-for-user-confirmation":
+                await WaitForUserConfirmationAsync(RequireParameters<WaitForUserConfirmationActionParameters>(node), cancellationToken);
                 return;
             default:
                 throw new NotSupportedException($"Flow action '{node.ActionId}' is not yet bound to runtime execution.");
@@ -593,6 +599,19 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             parameters.TimeoutMs,
             $"URL did not match '{parameters.UrlPattern}'.",
             cancellationToken);
+    }
+
+    private async Task WaitForUserConfirmationAsync(WaitForUserConfirmationActionParameters parameters, CancellationToken cancellationToken)
+    {
+        var confirmed = await _userConfirmationDialogService.WaitForConfirmationAsync(
+            parameters.Title,
+            parameters.Message,
+            cancellationToken);
+
+        if (!confirmed)
+        {
+            throw new OperationCanceledException("Flow execution was canceled by the user confirmation prompt.");
+        }
     }
 
     private async Task<BrowserSession> EnsureSessionAsync(bool forceHeaded, CancellationToken cancellationToken)

@@ -698,6 +698,83 @@ public sealed class FlowExecutionBridgeTests
         await bridge.CloseActiveSessionAsync();
     }
 
+    [Fact]
+    public async Task PrepareRunAsync_WaitForUserConfirmation_Continues_When_UserConfirms()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var confirmationService = new RecordingUserConfirmationDialogService(result: true);
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            userConfirmationDialogService: confirmationService);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-confirm",
+                    SourceNodeId = "confirm-node",
+                    DisplayLabel = "Wait for user confirmation",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "wait-for-user-confirmation",
+                    ActionParameters = new WaitForUserConfirmationActionParameters("Please confirm", "Continue this flow?"),
+                },
+            ],
+            Edges = [],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        confirmationService.CallCount.Should().Be(1);
+        confirmationService.LastTitle.Should().Be("Please confirm");
+        confirmationService.LastMessage.Should().Be("Continue this flow?");
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_WaitForUserConfirmation_Cancels_When_UserDeclines()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var confirmationService = new RecordingUserConfirmationDialogService(result: false);
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            userConfirmationDialogService: confirmationService);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-confirm",
+                    SourceNodeId = "confirm-node",
+                    DisplayLabel = "Wait for user confirmation",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "wait-for-user-confirmation",
+                    ActionParameters = new WaitForUserConfirmationActionParameters(),
+                },
+            ],
+            Edges = [],
+        };
+
+        var act = async () => await bridge.PrepareRunAsync(graph);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        confirmationService.CallCount.Should().Be(1);
+    }
+
     private static UiActionDragRequest CreateRequest(string actionId)
     {
         return new UiActionDragRequest
@@ -734,6 +811,30 @@ public sealed class FlowExecutionBridgeTests
         {
             RequestedBrowserType = browserType;
             return new RecordingBrowserLauncher(this);
+        }
+    }
+
+    private sealed class RecordingUserConfirmationDialogService : IUserConfirmationDialogService
+    {
+        private readonly bool _result;
+
+        public RecordingUserConfirmationDialogService(bool result)
+        {
+            _result = result;
+        }
+
+        public int CallCount { get; private set; }
+
+        public string? LastTitle { get; private set; }
+
+        public string? LastMessage { get; private set; }
+
+        public Task<bool> WaitForConfirmationAsync(string title, string message, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            LastTitle = title;
+            LastMessage = message;
+            return Task.FromResult(_result);
         }
     }
 

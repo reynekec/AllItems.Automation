@@ -983,6 +983,12 @@ public sealed class WaitForUrlInspectorViewModel : JsonActionInspectorViewModelB
         : base("Wait for URL", "Navigation", "Set URL matching behavior and timeout.", null, current, defaults, commit) { }
 }
 
+public sealed class WaitForUserConfirmationInspectorViewModel : JsonActionInspectorViewModelBase<WaitForUserConfirmationActionParameters>
+{
+    public WaitForUserConfirmationInspectorViewModel(WaitForUserConfirmationActionParameters current, WaitForUserConfirmationActionParameters defaults, Action<ActionParameters> commit)
+        : base("Wait for user confirmation", "Automation", "Pause the flow and wait for the user to click Continue.", null, current, defaults, commit) { }
+}
+
 public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewModelBase<ClickElementActionParameters>
 {
     private const string SelectorById = "Id";

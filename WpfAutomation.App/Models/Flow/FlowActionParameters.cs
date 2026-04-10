@@ -59,6 +59,10 @@ public sealed record WaitForUrlActionParameters(
     int TimeoutMs = 30000,
     bool IsRegex = false) : ActionParameters;
 
+public sealed record WaitForUserConfirmationActionParameters(
+    string Title = "User confirmation required",
+    string Message = "Click Continue to proceed with the automation flow.") : ActionParameters;
+
 public sealed record ClickElementActionParameters(
     string Selector = "",
     string? FrameSelector = null,

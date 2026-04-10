@@ -85,8 +85,7 @@
                               PreviewMouseWheel="CategoryTree_OnPreviewMouseWheel"
                               ItemsSource="{Binding FilteredCategoriesSource, ElementName=Root}">
                         <TreeView.Resources>
-                            <HierarchicalDataTemplate x:Key="CategoryTreeTemplate"
-                                                      DataType="{x:Type models:UiActionCategory}"
+                            <HierarchicalDataTemplate DataType="{x:Type models:UiActionCategory}"
                                                       ItemsSource="{Binding Items}">
                                 <TextBlock Style="{StaticResource ActionsSidebarCategoryHeaderTextStyle}"
                                            Text="{Binding CategoryName}"
@@ -105,9 +104,6 @@
                             <Style TargetType="TreeViewItem"
                                    BasedOn="{StaticResource ActionsSidebarTreeViewItemContainerStyle}" />
                         </TreeView.ItemContainerStyle>
-                        <TreeView.ItemTemplate>
-                            <StaticResource ResourceKey="CategoryTreeTemplate" />
-                        </TreeView.ItemTemplate>
                     </TreeView>
                 </ScrollViewer>
 

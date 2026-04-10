@@ -68,6 +68,7 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
             "go-forward" => new GoForwardInspectorViewModel(Coerce<GoForwardActionParameters>(node.ActionParameters, defaults), (GoForwardActionParameters)defaults, commit),
             "reload-page" => new ReloadPageInspectorViewModel(Coerce<ReloadPageActionParameters>(node.ActionParameters, defaults), (ReloadPageActionParameters)defaults, commit),
             "wait-for-url" => new WaitForUrlInspectorViewModel(Coerce<WaitForUrlActionParameters>(node.ActionParameters, defaults), (WaitForUrlActionParameters)defaults, commit),
+            "wait-for-user-confirmation" => new WaitForUserConfirmationInspectorViewModel(Coerce<WaitForUserConfirmationActionParameters>(node.ActionParameters, defaults), (WaitForUserConfirmationActionParameters)defaults, commit),
             "click-element" => new ClickElementInspectorViewModel(Coerce<ClickElementActionParameters>(node.ActionParameters, defaults), (ClickElementActionParameters)defaults, commit),
             "fill-input" => new FillInputInspectorViewModel(Coerce<FillInputActionParameters>(node.ActionParameters, defaults), (FillInputActionParameters)defaults, commit),
             "hover-element" => new HoverElementInspectorViewModel(Coerce<HoverElementActionParameters>(node.ActionParameters, defaults), (HoverElementActionParameters)defaults, commit),

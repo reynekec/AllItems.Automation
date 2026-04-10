@@ -25,6 +25,7 @@ public sealed class FlowActionParameterResolver : IFlowActionParameterResolver
             ["go-forward"] = new(typeof(GoForwardActionParameters), new GoForwardActionParameters()),
             ["reload-page"] = new(typeof(ReloadPageActionParameters), new ReloadPageActionParameters()),
             ["wait-for-url"] = new(typeof(WaitForUrlActionParameters), new WaitForUrlActionParameters()),
+            ["wait-for-user-confirmation"] = new(typeof(WaitForUserConfirmationActionParameters), new WaitForUserConfirmationActionParameters()),
             ["click-element"] = new(typeof(ClickElementActionParameters), new ClickElementActionParameters()),
             ["fill-input"] = new(typeof(FillInputActionParameters), new FillInputActionParameters()),
             ["hover-element"] = new(typeof(HoverElementActionParameters), new HoverElementActionParameters()),
