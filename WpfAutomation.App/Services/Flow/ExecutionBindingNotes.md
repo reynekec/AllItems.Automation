@@ -12,3 +12,10 @@ Planned final binding:
 2. The canvas flow is mapped with `IFlowDocumentMapper<ExecutionFlowGraph>`.
 3. The mapped graph is passed to `IFlowExecutionBridge.PrepareRunAsync`.
 4. Existing navigation-only behavior remains the fallback path when no flow graph is authored.
+
+## Pause/Resume Operational Notes
+
+- Pause is cooperative and checkpoint-based, not a hard preemptive interrupt.
+- Checkpoints are evaluated before action execution, at loop iteration boundaries, and during polling waits.
+- In-flight Playwright operations are allowed to complete before pause takes effect.
+- Stop remains a hard cancel path and unblocks paused waits via cancellation.

@@ -2,14 +2,22 @@ namespace WpfAutomation.App.Services.Flow;
 
 public interface IFlowExecutionBridge
 {
-    Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default);
+    Task PrepareRunAsync(
+        ExecutionFlowGraph executionGraph,
+        bool forceHeaded = false,
+        CancellationToken cancellationToken = default,
+        IFlowRunExecutionControl? runExecutionControl = null);
 
     Task CloseActiveSessionAsync();
 }
 
 public sealed class NullFlowExecutionBridge : IFlowExecutionBridge
 {
-    public Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default)
+    public Task PrepareRunAsync(
+        ExecutionFlowGraph executionGraph,
+        bool forceHeaded = false,
+        CancellationToken cancellationToken = default,
+        IFlowRunExecutionControl? runExecutionControl = null)
     {
         return Task.CompletedTask;
     }

@@ -99,6 +99,39 @@ public sealed class FlowRuntimeExecutorTests
         result.IterationsByNodeId["while-source"].Should().Be(0);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Pauses_At_Action_Boundary_And_Resumes()
+    {
+        var graph = CreateActionSequenceGraph();
+        using var cts = new CancellationTokenSource();
+        using var gate = new BoundaryPauseRunExecutionControl(pauseAtWaitCall: 2);
+
+        var executionTask = Task.Run(() => _executor.ExecuteAsync(graph, cts.Token, gate));
+
+        await gate.WaitUntilPausedAsync();
+        executionTask.IsCompleted.Should().BeFalse();
+
+        gate.Resume();
+        var result = await executionTask;
+
+        result.ExecutedNodeIds.Should().ContainInOrder("open-source", "click-source");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Cancelled_While_Paused_Throws()
+    {
+        var graph = CreateActionSequenceGraph();
+        using var cts = new CancellationTokenSource();
+        using var gate = new BoundaryPauseRunExecutionControl(pauseAtWaitCall: 1);
+
+        var executionTask = Task.Run(() => _executor.ExecuteAsync(graph, cts.Token, gate));
+
+        await gate.WaitUntilPausedAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await executionTask);
+    }
+
     // Cancellation test would go here but is complex to test properly with xUnit/Fact
     // The executor properly respects CancellationToken.ThrowIfCancellationRequested() calls
 
@@ -154,5 +187,118 @@ public sealed class FlowRuntimeExecutorTests
             Nodes = nodes.Cast<IExecutionFlowNode>().ToList().AsReadOnly(),
             Edges = new List<IExecutionFlowEdge>().AsReadOnly()
         };
+    }
+
+    private static ExecutionFlowGraph CreateActionSequenceGraph()
+    {
+        var first = new ExecutionFlowNode
+        {
+            ExecutionNodeId = "exec-open",
+            SourceNodeId = "open-source",
+            DisplayLabel = "Open",
+            NodeKind = FlowNodeKind.Action,
+            ActionId = "open-browser",
+        };
+
+        var second = new ExecutionFlowNode
+        {
+            ExecutionNodeId = "exec-click",
+            SourceNodeId = "click-source",
+            DisplayLabel = "Click",
+            NodeKind = FlowNodeKind.Action,
+            ActionId = "click-element",
+        };
+
+        return new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes = new List<IExecutionFlowNode> { first, second }.AsReadOnly(),
+            Edges = new List<IExecutionFlowEdge>
+            {
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-click",
+                },
+            }.AsReadOnly(),
+        };
+    }
+
+    private sealed class BoundaryPauseRunExecutionControl : IFlowRunExecutionControl
+    {
+        private readonly int _pauseAtWaitCall;
+        private readonly TaskCompletionSource<bool> _enteredPause = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly object _sync = new();
+        private TaskCompletionSource<bool> _resumeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _waitCount;
+        private bool _isPaused;
+
+        public BoundaryPauseRunExecutionControl(int pauseAtWaitCall)
+        {
+            _pauseAtWaitCall = pauseAtWaitCall;
+        }
+
+        public bool IsPauseRequested
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _isPaused;
+                }
+            }
+        }
+
+        public void RequestPause()
+        {
+            lock (_sync)
+            {
+                _isPaused = true;
+            }
+        }
+
+        public void Resume()
+        {
+            TaskCompletionSource<bool> signal;
+
+            lock (_sync)
+            {
+                _isPaused = false;
+                signal = _resumeSignal;
+                _resumeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            signal.TrySetResult(true);
+        }
+
+        public async Task WaitIfPausedAsync(CancellationToken cancellationToken = default)
+        {
+            Task waitTask;
+
+            lock (_sync)
+            {
+                _waitCount++;
+                if (_waitCount != _pauseAtWaitCall && !_isPaused)
+                {
+                    return;
+                }
+
+                _isPaused = true;
+                waitTask = _resumeSignal.Task;
+                _enteredPause.TrySetResult(true);
+            }
+
+            await waitTask.WaitAsync(cancellationToken);
+        }
+
+        public Task WaitUntilPausedAsync()
+        {
+            return _enteredPause.Task;
+        }
+
+        public void Dispose()
+        {
+            Resume();
+        }
     }
 }

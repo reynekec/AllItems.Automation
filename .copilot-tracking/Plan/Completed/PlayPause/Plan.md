@@ -45,62 +45,62 @@ Design outline:
 ## Phases
 
 ### Phase 1 - State Model and Command Surface
-- [ ] Add a Paused value to UiRunState.
-- [ ] Add MainViewModel state flags and computed properties for:
+- [x] Add a Paused value to UiRunState.
+- [x] Add MainViewModel state flags and computed properties for:
   - IsPaused
   - CanPause
   - CanResume
   - Run button icon glyph
   - Run button tooltip text (Continue playing in paused state)
-- [ ] Refactor StartCommand behavior into state-aware run/pause/resume action handling.
-- [ ] Keep StopCommand independent and available for hard cancel while running or paused.
-- [ ] Ensure command CanExecute transitions update correctly on every state transition.
+- [x] Refactor StartCommand behavior into state-aware run/pause/resume action handling.
+- [x] Keep StopCommand independent and available for hard cancel while running or paused.
+- [x] Ensure command CanExecute transitions update correctly on every state transition.
 
 ### Phase 2 - Cooperative Pause Controller
-- [ ] Introduce a shared execution control object for active run lifecycle (in-memory only).
-- [ ] Define contract for pause/resume gates, e.g.:
+- [x] Introduce a shared execution control object for active run lifecycle (in-memory only).
+- [x] Define contract for pause/resume gates, e.g.:
   - RequestPause
   - Resume
   - WaitIfPausedAsync(cancellationToken)
-- [ ] Ensure pause wait is cancellation-aware so Stop unblocks paused runs immediately.
-- [ ] Ensure controller is reset/disposed correctly at run completion/failure/cancel.
+- [x] Ensure pause wait is cancellation-aware so Stop unblocks paused runs immediately.
+- [x] Ensure controller is reset/disposed correctly at run completion/failure/cancel.
 
 ### Phase 3 - Runtime Integration Checkpoints
-- [ ] Integrate pause gate checkpoints in flow runtime and execution bridge:
+- [x] Integrate pause gate checkpoints in flow runtime and execution bridge:
   - Before each action execution
   - At each loop iteration boundary
   - In polling loops that already check cancellation
-- [ ] Preserve current cancellation behavior and exception flow.
-- [ ] Ensure resume continues from current index/iteration without rerunning prior completed steps.
-- [ ] Ensure no session teardown occurs on pause.
+- [x] Preserve current cancellation behavior and exception flow.
+- [x] Ensure resume continues from current index/iteration without rerunning prior completed steps.
+- [x] Ensure no session teardown occurs on pause.
 
 ### Phase 4 - UI Binding and Runner UX
-- [ ] Update FlowCanvas toolbar binding so middle button dynamically shows:
+- [x] Update FlowCanvas toolbar binding so middle button dynamically shows:
   - Play icon and Run tooltip in idle/completed states
   - Pause icon and Pause tooltip when running
   - Play icon and Continue playing tooltip when paused
-- [ ] Keep debug button behavior aligned with the same runtime control model.
-- [ ] Update status text and status bar badge for Paused state.
-- [ ] Add diagnostics log entries for pause lifecycle transitions.
+- [x] Keep debug button behavior aligned with the same runtime control model.
+- [x] Update status text and status bar badge for Paused state.
+- [x] Add diagnostics log entries for pause lifecycle transitions.
 
 ### Phase 5 - Test Coverage and Regression Safety
-- [ ] Update/extend MainViewModel tests for:
+- [x] Update/extend MainViewModel tests for:
   - Run -> Pause transition
   - Pause -> Continue playing transition
   - Stop while paused
   - Correct button/state/status transitions
-- [ ] Add runtime tests for checkpoint pause behavior:
+- [x] Add runtime tests for checkpoint pause behavior:
   - Pauses at action boundary
   - Resumes from next boundary
   - Stop cancels while waiting in paused gate
-- [ ] Add bridge-level tests validating no browser session close on pause and normal close on stop.
-- [ ] Verify existing run, debug, and cancel tests continue to pass.
+- [x] Add bridge-level tests validating no browser session close on pause and normal close on stop.
+- [x] Verify existing run, debug, and cancel tests continue to pass.
 
 ### Phase 6 - Hardening and Rollout
-- [ ] Validate diagnostics consistency and user-facing status messaging.
-- [ ] Validate behavior under long-running loops and polling waits.
-- [ ] Confirm no deadlocks or stuck states in pause/resume transitions.
-- [ ] Document operational limitations:
+- [x] Validate diagnostics consistency and user-facing status messaging.
+- [x] Validate behavior under long-running loops and polling waits.
+- [x] Confirm no deadlocks or stuck states in pause/resume transitions.
+- [x] Document operational limitations:
   - pause is cooperative checkpoint-based
   - in-flight Playwright calls complete before pause takes effect
 

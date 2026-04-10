@@ -7,7 +7,10 @@ public sealed record FlowRuntimeOptions(int GlobalMaxIterations = 1000);
 
 public interface IFlowRuntimeExecutor
 {
-    Task<FlowRuntimeExecutionResult> ExecuteAsync(ExecutionFlowGraph executionGraph, CancellationToken cancellationToken = default);
+    Task<FlowRuntimeExecutionResult> ExecuteAsync(
+        ExecutionFlowGraph executionGraph,
+        CancellationToken cancellationToken = default,
+        IFlowRunExecutionControl? runExecutionControl = null);
 }
 
 public sealed record FlowRuntimeExecutionResult(
@@ -30,7 +33,10 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         _options = options;
     }
 
-    public Task<FlowRuntimeExecutionResult> ExecuteAsync(ExecutionFlowGraph executionGraph, CancellationToken cancellationToken = default)
+    public Task<FlowRuntimeExecutionResult> ExecuteAsync(
+        ExecutionFlowGraph executionGraph,
+        CancellationToken cancellationToken = default,
+        IFlowRunExecutionControl? runExecutionControl = null)
     {
         ArgumentNullException.ThrowIfNull(executionGraph);
 
@@ -59,7 +65,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rootStart in rootStarts)
         {
-            ExecuteSequence(rootStart, nodeLookup, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteSequence(rootStart, nodeLookup, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
         }
 
         return Task.FromResult(new FlowRuntimeExecutionResult(executedNodeIds, iterations));
@@ -72,13 +78,15 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         ICollection<string> executedNodeIds,
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         var current = executionNodeId;
         var pathVisited = new HashSet<string>(StringComparer.Ordinal);
 
         while (true)
         {
+            WaitForResumeIfPaused(runExecutionControl, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!nodes.TryGetValue(current, out var node))
@@ -91,7 +99,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
                 throw new InvalidOperationException($"Runtime graph cycle detected at execution node '{current}'.");
             }
 
-            ExecuteNode(node, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteNode(node, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
 
             if (!outgoing.TryGetValue(current, out var nextNodes) || nextNodes.Count == 0)
             {
@@ -109,7 +117,8 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         ICollection<string> executedNodeIds,
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         executedNodeIds.Add(node.SourceNodeId);
 
@@ -123,13 +132,13 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
             switch (node.ContainerKind)
             {
                 case FlowContainerKind.For:
-                    ExecuteForLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken);
+                    ExecuteForLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken, runExecutionControl);
                     break;
                 case FlowContainerKind.ForEach:
-                    ExecuteForEachLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken);
+                    ExecuteForEachLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken, runExecutionControl);
                     break;
                 case FlowContainerKind.While:
-                    ExecuteWhileLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken);
+                    ExecuteWhileLoop(node, nodes, outgoing, iterations, variables, executedNodeIds, cancellationToken, runExecutionControl);
                     break;
             }
         }
@@ -160,7 +169,8 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
         ICollection<string> executedNodeIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         if (node.ContainerParameters is not ForContainerParameters parameters)
         {
@@ -186,6 +196,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
 
         for (var i = parameters.Start; parameters.Step > 0 ? i <= parameters.End : i >= parameters.End; i += parameters.Step)
         {
+            WaitForResumeIfPaused(runExecutionControl, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             iterationCount++;
             EnsureWithinCap(node.SourceNodeId, iterationCount, effectiveCap);
@@ -197,7 +208,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
                 ["iteration"] = iterationCount.ToString(),
                 ["index"] = i.ToString(),
             });
-            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
         }
 
         iterations[node.SourceNodeId] = iterationCount;
@@ -215,7 +226,8 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
         ICollection<string> executedNodeIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         if (node.ContainerParameters is not ForEachContainerParameters parameters)
         {
@@ -241,6 +253,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
 
         foreach (var item in items)
         {
+            WaitForResumeIfPaused(runExecutionControl, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             iterationCount++;
             EnsureWithinCap(node.SourceNodeId, iterationCount, effectiveCap);
@@ -253,7 +266,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
                 ["item"] = item,
                 ["itemVariable"] = parameters.ItemVariable,
             });
-            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
         }
 
         iterations[node.SourceNodeId] = iterationCount;
@@ -271,7 +284,8 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
         ICollection<string> executedNodeIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         if (node.ContainerParameters is not WhileContainerParameters parameters)
         {
@@ -296,6 +310,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
 
         while (EvaluateCondition(parameters.ConditionExpression, (IReadOnlyDictionary<string, string>)variables))
         {
+            WaitForResumeIfPaused(runExecutionControl, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             iterationCount++;
             EnsureWithinCap(node.SourceNodeId, iterationCount, effectiveCap);
@@ -305,7 +320,7 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
                 ["sourceNodeId"] = node.SourceNodeId,
                 ["iteration"] = iterationCount.ToString(),
             });
-            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteLane(lane, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
         }
 
         iterations[node.SourceNodeId] = iterationCount;
@@ -435,12 +450,24 @@ public sealed class FlowRuntimeExecutor : IFlowRuntimeExecutor
         ICollection<string> executedNodeIds,
         IDictionary<string, int> iterations,
         IDictionary<string, string> variables,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IFlowRunExecutionControl? runExecutionControl)
     {
         foreach (var laneNodeExecutionId in lane.NodeExecutionIds)
         {
+            WaitForResumeIfPaused(runExecutionControl, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            ExecuteSequence(laneNodeExecutionId, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken);
+            ExecuteSequence(laneNodeExecutionId, nodes, outgoing, executedNodeIds, iterations, variables, cancellationToken, runExecutionControl);
         }
+    }
+
+    private static void WaitForResumeIfPaused(IFlowRunExecutionControl? runExecutionControl, CancellationToken cancellationToken)
+    {
+        if (runExecutionControl is null)
+        {
+            return;
+        }
+
+        runExecutionControl.WaitIfPausedAsync(cancellationToken).GetAwaiter().GetResult();
     }
 }

@@ -29,7 +29,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private readonly FlowCanvasViewModel _flowCanvasViewModel;
     private readonly ObservableCollection<UiActionCategory> _actionCatalog;
     private readonly UiActionsSidebarState _actionsSidebarState;
-    private readonly AsyncRelayCommand _startCommand;
+    private readonly RelayCommand _startCommand;
     private readonly AsyncRelayCommand _debugCommand;
     private readonly RelayCommand _stopCommand;
     private readonly RelayCommand _invokeActionCommand;
@@ -44,6 +44,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     private readonly StatusBarItemModel _runStateBadgeItem;
     private readonly StatusBarItemModel _stopStatusActionItem;
     private CancellationTokenSource? _runCancellationTokenSource;
+    private IFlowRunExecutionControl? _activeRunExecutionControl;
     private DockLayoutSnapshot? _activeLayout;
     private UiActionItem? _selectedSidebarAction;
     private string _url = "https://example.com";
@@ -144,9 +145,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
             });
         }
 
-        _startCommand = new AsyncRelayCommand(RunAsync, () => !IsRunning);
+        _startCommand = new RelayCommand(ToggleRunPauseResume, CanUseStartCommand);
         _debugCommand = new AsyncRelayCommand(DebugAsync, () => !IsRunning);
-        _stopCommand = new RelayCommand(Stop, () => IsRunning);
+        _stopCommand = new RelayCommand(Stop, () => IsRunning || IsPaused);
         _invokeActionCommand = new RelayCommand(InvokeAction, parameter => parameter is UiActionInvokeRequest);
         _toggleCategoryCommand = new RelayCommand(ToggleCategory, parameter => parameter is UiActionCategoryToggleRequest);
         _startDragCommand = new RelayCommand(StartDragAction, parameter => parameter is UiActionDragRequest);
@@ -277,10 +278,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         {
             if (SetProperty(ref _isRunning, value))
             {
+                NotifyRunControlPropertiesChanged();
                 RaiseCommandStateChanged();
             }
         }
     }
+
+    public bool IsPaused => RunState == UiRunState.Paused;
+
+    public bool CanPause => IsRunning && RunState == UiRunState.Running;
+
+    public bool CanResume => IsRunning && RunState == UiRunState.Paused;
+
+    public string RunButtonIconGlyph => IsPaused ? "\uE768" : CanPause ? "\uE769" : "\uE768";
+
+    public string RunButtonToolTip => IsPaused ? "Continue playing" : CanPause ? "Pause" : "Run";
 
     public UiRunState RunState
     {
@@ -290,6 +302,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
             if (SetProperty(ref _runState, value))
             {
                 _runStateBadgeItem.Text = value.ToString();
+                NotifyRunControlPropertiesChanged();
+                RaiseCommandStateChanged();
             }
         }
     }
@@ -409,6 +423,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
     {
         var hasAuthoredFlow = _flowCanvasViewModel.Document.Nodes.Count > 0;
 
+        _flowCanvasViewModel.ClearRuntimeNodeOutcomes();
+
         if (!hasAuthoredFlow && string.IsNullOrWhiteSpace(Url))
         {
             SetStatus("Enter a valid URL", "$(warning)");
@@ -417,6 +433,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
         _runCancellationTokenSource?.Dispose();
         _runCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(commandToken);
+        _activeRunExecutionControl?.Dispose();
+        _activeRunExecutionControl = new FlowRunExecutionControl();
         var originalHeadless = _browserOptions.Headless;
 
         if (debugMode && originalHeadless)
@@ -446,12 +464,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
             if (hasAuthoredFlow)
             {
                 var executionGraph = _flowCanvasViewModel.CreateExecutionGraph();
-                await _flowExecutionBridge.PrepareRunAsync(executionGraph, debugMode, _runCancellationTokenSource.Token);
+                await _flowExecutionBridge.PrepareRunAsync(executionGraph, debugMode, _runCancellationTokenSource.Token, _activeRunExecutionControl);
             }
             else
             {
                 await _orchestrator.RunNavigationAsync(Url, _runCancellationTokenSource.Token);
             }
+
+            if (_activeRunExecutionControl is not null)
+            {
+                await _activeRunExecutionControl.WaitIfPausedAsync(_runCancellationTokenSource.Token);
+            }
+
+            _runCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
             RunState = UiRunState.Completed;
             SetStatus(debugMode ? "Debug session ready" : "Completed", "$(check)");
@@ -480,11 +505,47 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
             IsRunning = false;
             _runCancellationTokenSource?.Dispose();
             _runCancellationTokenSource = null;
+            _activeRunExecutionControl?.Dispose();
+            _activeRunExecutionControl = null;
+        }
+    }
+
+    private bool CanUseStartCommand()
+    {
+        return !IsRunning || CanPause || CanResume;
+    }
+
+    private void ToggleRunPauseResume()
+    {
+        if (!IsRunning)
+        {
+            _ = RunAsync(CancellationToken.None);
+            return;
+        }
+
+        if (CanPause)
+        {
+            _activeRunExecutionControl?.RequestPause();
+            RunState = UiRunState.Paused;
+            SetStatus("Paused", "$(debug-pause)");
+            _diagnosticsService.Info("Pause requested.");
+            _diagnosticsService.Info("Run paused.");
+            return;
+        }
+
+        if (CanResume)
+        {
+            _activeRunExecutionControl?.Resume();
+            RunState = UiRunState.Running;
+            SetStatus("Running", "$(sync~spin)");
+            _diagnosticsService.Info("Continue playing requested.");
+            _diagnosticsService.Info("Run resumed.");
         }
     }
 
     private void Stop()
     {
+        _activeRunExecutionControl?.Resume();
         _runCancellationTokenSource?.Cancel();
         _diagnosticsService.Warn("Stop requested");
         _ = CloseActiveRunsAsync();
@@ -514,6 +575,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
         await _uiDispatcherService.InvokeAsync(() =>
         {
+            UpdateRuntimeNodeOutcomes(entry);
+
             Logs.Add(new UiLogItem
             {
                 TimestampUtc = entry.TimestampUtc,
@@ -526,6 +589,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
             UpdateDiagnosticsCountStatusItem();
         });
+    }
+
+    private void UpdateRuntimeNodeOutcomes(LogEntry entry)
+    {
+        if (entry.ContextData is null)
+        {
+            return;
+        }
+
+        if (!entry.ContextData.TryGetValue("sourceNodeId", out var sourceNodeId) || string.IsNullOrWhiteSpace(sourceNodeId))
+        {
+            return;
+        }
+
+        if (entry.Message.Contains("[RUN][NODE][PASS]", StringComparison.Ordinal))
+        {
+            _flowCanvasViewModel.MarkNodeRunSucceeded(sourceNodeId);
+            return;
+        }
+
+        if (entry.Message.Contains("[RUN][NODE][FAIL]", StringComparison.Ordinal))
+        {
+            _flowCanvasViewModel.MarkNodeRunFailed(sourceNodeId);
+        }
     }
 
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
@@ -545,7 +632,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         _startCommand.RaiseCanExecuteChanged();
         _debugCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
-        _stopStatusActionItem.IsEnabled = IsRunning;
+        _stopStatusActionItem.IsEnabled = IsRunning || IsPaused;
+    }
+
+    private void NotifyRunControlPropertiesChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPaused)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanPause)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanResume)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RunButtonIconGlyph)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RunButtonToolTip)));
     }
 
     private void InvokeAction(object? parameter)

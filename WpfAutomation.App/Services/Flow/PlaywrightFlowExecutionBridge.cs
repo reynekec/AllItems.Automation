@@ -28,6 +28,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
     private BrowserType _activeBrowserType = BrowserType.Chromium;
     private BrowserSession? _activeSession;
     private IPageWrapper? _currentPage;
+    private IFlowRunExecutionControl? _activeRunExecutionControl;
 
     public PlaywrightFlowExecutionBridge(
         IFlowRuntimeExecutor runtimeExecutor,
@@ -49,7 +50,11 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         _userConfirmationDialogService = userConfirmationDialogService ?? new NullUserConfirmationDialogService();
     }
 
-    public async Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default)
+    public async Task PrepareRunAsync(
+        ExecutionFlowGraph executionGraph,
+        bool forceHeaded = false,
+        CancellationToken cancellationToken = default,
+        IFlowRunExecutionControl? runExecutionControl = null)
     {
         ArgumentNullException.ThrowIfNull(executionGraph);
 
@@ -60,46 +65,59 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
 
         await CloseActiveSessionAsync();
 
-        var runtimeResult = await _runtimeExecutor.ExecuteAsync(executionGraph, cancellationToken);
-        var nodesBySourceId = executionGraph.Nodes.ToDictionary(node => node.SourceNodeId, StringComparer.Ordinal);
-
-        _diagnosticsService.Info("Flow run start.", new Dictionary<string, string>
+        _activeRunExecutionControl = runExecutionControl;
+        try
         {
-            ["nodeCount"] = executionGraph.Nodes.Count.ToString(),
-            ["edgeCount"] = executionGraph.Edges.Count.ToString(),
-            ["executedActionCount"] = runtimeResult.ExecutedNodeIds.Count.ToString(),
-        });
+            var runtimeResult = await _runtimeExecutor.ExecuteAsync(executionGraph, cancellationToken, _activeRunExecutionControl);
+            var nodesBySourceId = executionGraph.Nodes.ToDictionary(node => node.SourceNodeId, StringComparer.Ordinal);
 
-        foreach (var sourceNodeId in runtimeResult.ExecutedNodeIds)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!nodesBySourceId.TryGetValue(sourceNodeId, out var node) || node.NodeKind != FlowNodeKind.Action)
+            _diagnosticsService.Info("Flow run start.", new Dictionary<string, string>
             {
-                continue;
+                ["nodeCount"] = executionGraph.Nodes.Count.ToString(),
+                ["edgeCount"] = executionGraph.Edges.Count.ToString(),
+                ["executedActionCount"] = runtimeResult.ExecutedNodeIds.Count.ToString(),
+            });
+
+            foreach (var sourceNodeId in runtimeResult.ExecutedNodeIds)
+            {
+                await WaitForResumeIfPausedAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!nodesBySourceId.TryGetValue(sourceNodeId, out var node) || node.NodeKind != FlowNodeKind.Action)
+                {
+                    continue;
+                }
+
+                var context = CreateNodeContext(node);
+                _diagnosticsService.Info("Flow action start.", context);
+                _diagnosticsService.Info(BuildNodeOutcomeMessage("START", node), context);
+
+                try
+                {
+                    await ExecuteActionAsync(node, forceHeaded, cancellationToken);
+                    _diagnosticsService.Info("Flow action complete.", context);
+                    _diagnosticsService.Info(BuildNodeOutcomeMessage("PASS", node), context);
+                }
+                catch (OperationCanceledException)
+                {
+                    _diagnosticsService.Warn("Flow action cancelled.", context);
+                    _diagnosticsService.Warn(BuildNodeOutcomeMessage("CANCELLED", node), context);
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _diagnosticsService.Error("Flow action failed.", exception, context);
+                    _diagnosticsService.Error(BuildNodeOutcomeMessage("FAIL", node), exception, context);
+                    throw;
+                }
             }
 
-            var context = CreateNodeContext(node);
-            _diagnosticsService.Info("Flow action start.", context);
-
-            try
-            {
-                await ExecuteActionAsync(node, forceHeaded, cancellationToken);
-                _diagnosticsService.Info("Flow action complete.", context);
-            }
-            catch (OperationCanceledException)
-            {
-                _diagnosticsService.Warn("Flow action cancelled.", context);
-                throw;
-            }
-            catch (Exception exception)
-            {
-                _diagnosticsService.Error("Flow action failed.", exception, context);
-                throw;
-            }
+            _diagnosticsService.Info("Flow run complete.");
         }
-
-        _diagnosticsService.Info("Flow run complete.");
+        finally
+        {
+            _activeRunExecutionControl = null;
+        }
     }
 
     public async Task CloseActiveSessionAsync()
@@ -667,6 +685,11 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         };
     }
 
+    private static string BuildNodeOutcomeMessage(string outcome, IExecutionFlowNode node)
+    {
+        return $"[RUN][NODE][{outcome}] {node.DisplayLabel} ({node.SourceNodeId})";
+    }
+
     private static void EnsureUnsupportedParameter(bool condition, string actionId, string parameterName)
     {
         if (condition)
@@ -736,13 +759,14 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             || currentUrl.Contains(pattern, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static async Task WaitUntilAsync(Func<Task<bool>> predicate, int timeoutMs, string failureMessage, CancellationToken cancellationToken)
+    private async Task WaitUntilAsync(Func<Task<bool>> predicate, int timeoutMs, string failureMessage, CancellationToken cancellationToken)
     {
         var timeout = TimeSpan.FromMilliseconds(timeoutMs);
         var stopwatch = Stopwatch.StartNew();
 
         while (stopwatch.Elapsed < timeout)
         {
+            await WaitForResumeIfPausedAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (await predicate())
@@ -755,6 +779,16 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         }
 
         throw new TimeoutException(failureMessage);
+    }
+
+    private async Task WaitForResumeIfPausedAsync(CancellationToken cancellationToken)
+    {
+        if (_activeRunExecutionControl is null)
+        {
+            return;
+        }
+
+        await _activeRunExecutionControl.WaitIfPausedAsync(cancellationToken);
     }
 
     private sealed class NullWebAuthExecutor : IWebAuthExecutor

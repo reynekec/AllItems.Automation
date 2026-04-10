@@ -129,14 +129,18 @@
 
         <DataTemplate DataType="{x:Type flow:FlowActionNodeModel}">
             <views:FlowActionNodeControl
-                SelectedNodeIds="{Binding DataContext.InteractionState.SelectedNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                SelectedNodeIds="{Binding DataContext.InteractionState.SelectedNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                SuccessfulNodeIds="{Binding DataContext.SuccessfulRunNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                FailedNodeIds="{Binding DataContext.FailedRunNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}" />
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type flow:FlowContainerNodeModel}">
             <views:FlowContainerNodeControl
                 SelectedNodeIds="{Binding DataContext.InteractionState.SelectedNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}"
                 HoveredLaneId="{Binding DataContext.InteractionState.HoveredLaneId, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                ToggleCollapseCommand="{Binding DataContext.ToggleCollapseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                ToggleCollapseCommand="{Binding DataContext.ToggleCollapseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                SuccessfulNodeIds="{Binding DataContext.SuccessfulRunNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                FailedNodeIds="{Binding DataContext.FailedRunNodeIds, RelativeSource={RelativeSource AncestorType=UserControl}}" />
         </DataTemplate>
     </UserControl.Resources>
 
@@ -208,6 +212,8 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="1" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="1" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <Button Grid.Column="0"
@@ -245,9 +251,10 @@
                             <Button Grid.Column="2"
                                     Style="{StaticResource SegmentedToolbarButtonMiddleStyle}"
                                     Command="{Binding DataContext.StartCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    ToolTip="Run"
+                                    ToolTip="{Binding DataContext.RunButtonToolTip, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Foreground="#FF1B6E3A">
-                                <TextBlock Style="{StaticResource CanvasToolbarGlyphStyle}" Text="&#xE768;" />
+                                <TextBlock Style="{StaticResource CanvasToolbarGlyphStyle}"
+                                           Text="{Binding DataContext.RunButtonIconGlyph, RelativeSource={RelativeSource AncestorType=Window}}" />
                             </Button>
 
                             <Border Grid.Column="3"
@@ -255,11 +262,23 @@
                                     Margin="0,6" />
 
                             <Button Grid.Column="4"
-                                    Style="{StaticResource SegmentedToolbarButtonRightStyle}"
+                                    Style="{StaticResource SegmentedToolbarButtonMiddleStyle}"
                                     Command="{Binding DataContext.DebugCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     ToolTip="Debug"
                                     Foreground="#FF8B5C12">
                                 <TextBlock Style="{StaticResource CanvasToolbarGlyphStyle}" Text="&#xEBE8;" />
+                            </Button>
+
+                            <Border Grid.Column="5"
+                                    Background="#FFD4DFE7"
+                                    Margin="0,6" />
+
+                            <Button Grid.Column="6"
+                                    Style="{StaticResource SegmentedToolbarButtonRightStyle}"
+                                    Command="{Binding DataContext.StopCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    ToolTip="Stop"
+                                    Foreground="#FFB00020">
+                                <TextBlock Style="{StaticResource CanvasToolbarGlyphStyle}" Text="&#xE71A;" />
                             </Button>
                         </Grid>
                     </Border>
@@ -385,6 +404,95 @@
                             <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnNodeMouseLeftButtonDown" />
                         </Style>
                     </ItemsControl.ItemContainerStyle>
+                </ItemsControl>
+
+                <ItemsControl ItemsSource="{Binding Nodes}" IsHitTestVisible="False" ClipToBounds="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Canvas />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="{Binding Bounds.X}" />
+                            <Setter Property="Canvas.Top" Value="{Binding Bounds.Y}" />
+                            <Setter Property="Height" Value="{Binding Bounds.Height}" />
+                            <Setter Property="Panel.ZIndex" Value="20" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Height="{Binding Bounds.Height}">
+                                <Border Width="18"
+                                        Height="18"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="-30,0,0,0"
+                                        CornerRadius="9"
+                                        Background="#FF177E43"
+                                        BorderBrush="#FFFFFFFF"
+                                        BorderThickness="1.5"
+                                        Visibility="Collapsed">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Value="True">
+                                                    <DataTrigger.Binding>
+                                                        <MultiBinding Converter="{StaticResource SelectionContainsNodeIdConverter}">
+                                                            <Binding Path="NodeId" />
+                                                            <Binding Path="DataContext.SuccessfulRunNodeIds" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        </MultiBinding>
+                                                    </DataTrigger.Binding>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock FontSize="12"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="White"
+                                               Text="✔" />
+                                </Border>
+
+                                <Border Width="18"
+                                        Height="18"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="-30,0,0,0"
+                                        CornerRadius="9"
+                                        Background="#FFC62828"
+                                        BorderBrush="#FFFFFFFF"
+                                        BorderThickness="1.5"
+                                        Visibility="Collapsed">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Value="True">
+                                                    <DataTrigger.Binding>
+                                                        <MultiBinding Converter="{StaticResource SelectionContainsNodeIdConverter}">
+                                                            <Binding Path="NodeId" />
+                                                            <Binding Path="DataContext.FailedRunNodeIds" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                        </MultiBinding>
+                                                    </DataTrigger.Binding>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock FontSize="12"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="White"
+                                               Text="✖" />
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
                 <ItemsControl ItemsSource="{Binding EdgeVisuals}" IsHitTestVisible="False">

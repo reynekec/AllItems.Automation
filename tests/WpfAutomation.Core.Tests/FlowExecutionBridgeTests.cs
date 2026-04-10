@@ -76,6 +76,43 @@ public sealed class FlowExecutionBridgeTests
     }
 
     [Fact]
+    public async Task PrepareRunAsync_Logs_NodeOutcome_Pass_Marker()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var diagnostics = new DiagnosticsService();
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            diagnostics);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+            ],
+            Edges = [],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        diagnostics.GetLogs().Should().Contain(entry => entry.Message.Contains("[RUN][NODE][PASS] Open browser (open-node)"));
+
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
     public async Task PrepareRunAsync_Uses_ActionSpecific_Timeouts_For_Navigation_And_Click()
     {
         var runtimeExecutor = new StubFlowRuntimeExecutor();
@@ -775,6 +812,68 @@ public sealed class FlowExecutionBridgeTests
         confirmationService.CallCount.Should().Be(1);
     }
 
+    [Fact]
+    public async Task PrepareRunAsync_WaitForUrl_Pauses_Within_Polling_And_Resumes_Without_Deadlock()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService());
+
+        var currentUrl = "https://example.com/start";
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns(() => currentUrl);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-wait-url",
+                    SourceNodeId = "wait-url-node",
+                    DisplayLabel = "Wait for URL",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "wait-for-url",
+                    ActionParameters = new WaitForUrlActionParameters("https://example.com/done", 2000, false),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-wait-url",
+                },
+            ],
+        };
+
+        using var runControl = new PauseAtCallExecutionControl(pauseAtCall: 3);
+        var runTask = bridge.PrepareRunAsync(graph, runExecutionControl: runControl);
+
+        await runControl.WaitUntilPausedAsync();
+        runTask.IsCompleted.Should().BeFalse();
+
+        currentUrl = "https://example.com/done";
+        runControl.Resume();
+
+        await runTask;
+    }
+
     private static UiActionDragRequest CreateRequest(string actionId)
     {
         return new UiActionDragRequest
@@ -789,11 +888,92 @@ public sealed class FlowExecutionBridgeTests
 
     private sealed class StubFlowRuntimeExecutor : IFlowRuntimeExecutor
     {
-        public Task<FlowRuntimeExecutionResult> ExecuteAsync(ExecutionFlowGraph executionGraph, CancellationToken cancellationToken = default)
+        public Task<FlowRuntimeExecutionResult> ExecuteAsync(
+            ExecutionFlowGraph executionGraph,
+            CancellationToken cancellationToken = default,
+            IFlowRunExecutionControl? runExecutionControl = null)
         {
             return Task.FromResult(new FlowRuntimeExecutionResult(
                 executionGraph.Nodes.Select(node => node.SourceNodeId).ToList(),
                 new Dictionary<string, int>(StringComparer.Ordinal)));
+        }
+    }
+
+    private sealed class PauseAtCallExecutionControl : IFlowRunExecutionControl
+    {
+        private readonly int _pauseAtCall;
+        private readonly TaskCompletionSource<bool> _enteredPause = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly object _sync = new();
+        private TaskCompletionSource<bool> _resumeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _waitCallCount;
+        private bool _isPauseRequested;
+
+        public PauseAtCallExecutionControl(int pauseAtCall)
+        {
+            _pauseAtCall = pauseAtCall;
+        }
+
+        public bool IsPauseRequested
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _isPauseRequested;
+                }
+            }
+        }
+
+        public void RequestPause()
+        {
+            lock (_sync)
+            {
+                _isPauseRequested = true;
+            }
+        }
+
+        public void Resume()
+        {
+            TaskCompletionSource<bool> signal;
+
+            lock (_sync)
+            {
+                _isPauseRequested = false;
+                signal = _resumeSignal;
+                _resumeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            signal.TrySetResult(true);
+        }
+
+        public async Task WaitIfPausedAsync(CancellationToken cancellationToken = default)
+        {
+            Task waitTask;
+
+            lock (_sync)
+            {
+                _waitCallCount++;
+                if (_waitCallCount != _pauseAtCall && !_isPauseRequested)
+                {
+                    return;
+                }
+
+                _isPauseRequested = true;
+                waitTask = _resumeSignal.Task;
+                _enteredPause.TrySetResult(true);
+            }
+
+            await waitTask.WaitAsync(cancellationToken);
+        }
+
+        public Task WaitUntilPausedAsync()
+        {
+            return _enteredPause.Task;
+        }
+
+        public void Dispose()
+        {
+            Resume();
         }
     }
 

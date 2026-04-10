@@ -46,6 +46,8 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
     private DropSnapshot? _lastDropSnapshot;
     private string? _lastCreatedNodeId;
     private string? _currentDocumentPath;
+    private readonly HashSet<string> _successfulRunNodeIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _failedRunNodeIds = new(StringComparer.Ordinal);
 
     public FlowCanvasViewModel(
         DiagnosticsService diagnosticsService,
@@ -196,6 +198,63 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
     public ICommand ValidateForRunCommand { get; }
 
     public bool HasOpenedFile => !string.IsNullOrWhiteSpace(_currentDocumentPath);
+
+    public IReadOnlyCollection<string> SuccessfulRunNodeIds => _successfulRunNodeIds;
+
+    public IReadOnlyCollection<string> FailedRunNodeIds => _failedRunNodeIds;
+
+    public void MarkNodeRunSucceeded(string nodeId)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+        {
+            return;
+        }
+
+        var changed = _successfulRunNodeIds.Add(nodeId);
+        if (_failedRunNodeIds.Remove(nodeId))
+        {
+            changed = true;
+        }
+
+        if (changed)
+        {
+            OnPropertyChanged(nameof(SuccessfulRunNodeIds));
+            OnPropertyChanged(nameof(FailedRunNodeIds));
+        }
+    }
+
+    public void MarkNodeRunFailed(string nodeId)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+        {
+            return;
+        }
+
+        var changed = _failedRunNodeIds.Add(nodeId);
+        if (_successfulRunNodeIds.Remove(nodeId))
+        {
+            changed = true;
+        }
+
+        if (changed)
+        {
+            OnPropertyChanged(nameof(FailedRunNodeIds));
+            OnPropertyChanged(nameof(SuccessfulRunNodeIds));
+        }
+    }
+
+    public void ClearRuntimeNodeOutcomes()
+    {
+        if (_successfulRunNodeIds.Count == 0 && _failedRunNodeIds.Count == 0)
+        {
+            return;
+        }
+
+        _successfulRunNodeIds.Clear();
+        _failedRunNodeIds.Clear();
+        OnPropertyChanged(nameof(SuccessfulRunNodeIds));
+        OnPropertyChanged(nameof(FailedRunNodeIds));
+    }
 
     public ExecutionFlowGraph CreateExecutionGraph()
     {

@@ -28,6 +28,20 @@ public partial class FlowContainerNodeControl : UserControl
             typeof(FlowContainerNodeControl),
             new PropertyMetadata(null));
 
+    public static readonly DependencyProperty SuccessfulNodeIdsProperty =
+        DependencyProperty.Register(
+            nameof(SuccessfulNodeIds),
+            typeof(IEnumerable<string>),
+            typeof(FlowContainerNodeControl),
+            new PropertyMetadata(null));
+
+    public static readonly DependencyProperty FailedNodeIdsProperty =
+        DependencyProperty.Register(
+            nameof(FailedNodeIds),
+            typeof(IEnumerable<string>),
+            typeof(FlowContainerNodeControl),
+            new PropertyMetadata(null));
+
     public FlowContainerNodeControl()
     {
         InitializeComponent();
@@ -49,5 +63,17 @@ public partial class FlowContainerNodeControl : UserControl
     {
         get => (ICommand?)GetValue(ToggleCollapseCommandProperty);
         set => SetValue(ToggleCollapseCommandProperty, value);
+    }
+
+    public IEnumerable<string>? SuccessfulNodeIds
+    {
+        get => (IEnumerable<string>?)GetValue(SuccessfulNodeIdsProperty);
+        set => SetValue(SuccessfulNodeIdsProperty, value);
+    }
+
+    public IEnumerable<string>? FailedNodeIds
+    {
+        get => (IEnumerable<string>?)GetValue(FailedNodeIdsProperty);
+        set => SetValue(FailedNodeIdsProperty, value);
     }
 }
