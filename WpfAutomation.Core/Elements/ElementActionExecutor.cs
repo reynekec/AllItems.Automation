@@ -63,7 +63,7 @@ public sealed class ElementActionExecutor
                 lastException = exception;
                 if (attempt < maxAttempts)
                 {
-                    _diagnosticsService.Warn($"{actionName} failed on attempt {attempt}/{maxAttempts}. Retrying...");
+                    _diagnosticsService.Warn($"{actionName} failed on attempt {attempt}/{maxAttempts}. {exception.GetType().Name}: {exception.Message}. Retrying...");
                 }
             }
         }

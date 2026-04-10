@@ -9,6 +9,7 @@ using WpfAutomation.App.Docking.Services;
 using WpfAutomation.App.Commands;
 using WpfAutomation.App.Models;
 using WpfAutomation.App.Services;
+using WpfAutomation.App.Services.Diagnostics;
 using WpfAutomation.App.Services.Flow;
 using WpfAutomation.Core.Configuration;
 using WpfAutomation.Core.Diagnostics;
@@ -491,6 +492,26 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
     private async void OnLogEntryAdded(LogEntry entry)
     {
+        // Mirror in-memory diagnostics to the persisted app log for post-run troubleshooting.
+        var persistedMessage = entry.Message;
+        if (entry.ContextData is not null && entry.ContextData.TryGetValue("screenshotPath", out var screenshotPath) && !string.IsNullOrWhiteSpace(screenshotPath))
+        {
+            persistedMessage = $"{persistedMessage} (screenshotPath={screenshotPath})";
+        }
+
+        if (string.Equals(entry.Level, "ERROR", StringComparison.OrdinalIgnoreCase))
+        {
+            AppCrashLogger.Error(persistedMessage);
+        }
+        else if (string.Equals(entry.Level, "WARN", StringComparison.OrdinalIgnoreCase))
+        {
+            AppCrashLogger.Warn(persistedMessage);
+        }
+        else
+        {
+            AppCrashLogger.Info(persistedMessage);
+        }
+
         await _uiDispatcherService.InvokeAsync(() =>
         {
             Logs.Add(new UiLogItem

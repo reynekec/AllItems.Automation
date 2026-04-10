@@ -96,11 +96,11 @@ public sealed class CredentialManagerPhaseTests : IDisposable
 
         var dialogService = new Mock<ICredentialManagerDialogService>(MockBehavior.Strict);
         dialogService
-            .Setup(service => service.ShowDialog(It.IsAny<Guid?>()))
+            .Setup(service => service.ShowDialog(It.IsAny<Guid?>(), It.IsAny<bool>()))
             .Returns(new CredentialManagerDialogResult(true, Guid.Parse("3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042"), "Contoso Login"));
 
         var viewModel = new NavigateToUrlInspectorViewModel(
-            new NavigateToUrlActionParameters("https://example.com", 30000, true, null, null),
+            new NavigateToUrlActionParameters("https://example.com", 30000, true, null, null, true),
             new NavigateToUrlActionParameters(),
             parameters => committed = (NavigateToUrlActionParameters)parameters,
             dialogService.Object);
@@ -117,7 +117,7 @@ public sealed class CredentialManagerPhaseTests : IDisposable
     public void NavigateInspector_Hides_Credential_Fields_From_Generic_Editor()
     {
         var viewModel = new NavigateToUrlInspectorViewModel(
-            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login"),
+            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login", true),
             new NavigateToUrlActionParameters(),
             _ => { });
 
@@ -136,7 +136,7 @@ public sealed class CredentialManagerPhaseTests : IDisposable
             .ReturnsAsync((CredentialEntry?)null);
 
         var viewModel = new NavigateToUrlInspectorViewModel(
-            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login"),
+            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login", true),
             new NavigateToUrlActionParameters(),
             _ => { },
             credentialStore: credentialStore.Object);
@@ -154,7 +154,7 @@ public sealed class CredentialManagerPhaseTests : IDisposable
         credentialStore.SetupGet(store => store.IsUnlocked).Returns(false);
 
         var viewModel = new NavigateToUrlInspectorViewModel(
-            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login"),
+            new NavigateToUrlActionParameters("https://example.com", 30000, true, "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042", "Contoso Login", true),
             new NavigateToUrlActionParameters(),
             parameters => committed = (NavigateToUrlActionParameters)parameters,
             credentialStore: credentialStore.Object);
@@ -182,7 +182,8 @@ public sealed class CredentialManagerPhaseTests : IDisposable
                 30000,
                 true,
                 "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042",
-                "Contoso Login"),
+                "Contoso Login",
+                true),
             new NavigateToUrlActionParameters(),
             _ => { },
             credentialStore: credentialStore.Object);

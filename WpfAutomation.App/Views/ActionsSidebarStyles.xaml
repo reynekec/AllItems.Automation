@@ -156,7 +156,13 @@
                         </Border>
 
                         <!-- Child items (collapsed by default) -->
-                        <ItemsPresenter x:Name="ChildItemsHost" Visibility="Collapsed" />
+                        <Border x:Name="ChildItemsHost"
+                                Visibility="Collapsed"
+                                Margin="18,0,0,0"
+                                BorderBrush="{StaticResource ActionsSidebar.DividerBrush}"
+                                BorderThickness="1,0,0,0">
+                            <ItemsPresenter Margin="8,0,0,0" />
+                        </Border>
 
                     </StackPanel>
                     <ControlTemplate.Triggers>

@@ -7,13 +7,19 @@
              mc:Ignorable="d"
              d:DesignHeight="360"
              d:DesignWidth="320">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+
     <StackPanel>
         <TextBlock Text="Navigate to URL"
                    Style="{StaticResource NodeInspector.EmphasisValueTextStyle}"
                    Margin="0,0,0,8" />
         <shared:ActionInspectorEditorView />
 
-        <Border Style="{StaticResource NodeInspector.CategoryContainerStyle}" Margin="0,8,0,0">
+        <Border Style="{StaticResource NodeInspector.CategoryContainerStyle}"
+                Margin="0,8,0,0"
+                Visibility="{Binding IsAuthenticationSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel>
                 <TextBlock Style="{StaticResource NodeInspector.CategoryHeaderTextStyle}" Text="Authentication" />
                 <TextBlock Style="{StaticResource NodeInspector.HelpTextStyle}" Text="Select a credential to use when logging in to this page." />

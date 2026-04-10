@@ -165,6 +165,160 @@ public sealed class FlowExecutionBridgeTests
     }
 
     [Fact]
+    public async Task PrepareRunAsync_ClickElement_RetriesWithInteractiveIdSelector_OnStrictModeViolation()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var diagnostics = new DiagnosticsService();
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            diagnostics);
+
+        const string idSelector = "[id=\"continue\"]";
+        const string interactiveSelector = "input[id=\"continue\"], button[id=\"continue\"], a[id=\"continue\"], [role=\"button\"][id=\"continue\"]";
+
+        var strictLocator = new Mock<ILocator>(MockBehavior.Strict);
+        strictLocator
+            .Setup(candidate => candidate.ClickAsync(It.Is<LocatorClickOptions>(options => options.Timeout == 10000)))
+            .ThrowsAsync(new Exception("strict mode violation: locator resolved to 2 elements"));
+        strictLocator
+            .Setup(candidate => candidate.ScreenshotAsync(It.IsAny<LocatorScreenshotOptions>()))
+            .ReturnsAsync(Array.Empty<byte>());
+
+        var interactiveLocator = new Mock<ILocator>(MockBehavior.Strict);
+        interactiveLocator
+            .Setup(candidate => candidate.ClickAsync(It.Is<LocatorClickOptions>(options => options.Timeout == 10000)))
+            .Returns(Task.CompletedTask);
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.Locator(idSelector, It.IsAny<PageLocatorOptions>()))
+            .Returns(strictLocator.Object);
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.Locator(interactiveSelector, It.IsAny<PageLocatorOptions>()))
+            .Returns(interactiveLocator.Object);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-click",
+                    SourceNodeId = "click-node",
+                    DisplayLabel = "Click",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "click-element",
+                    ActionParameters = new ClickElementActionParameters(idSelector, null, false, 10000),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-click",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        diagnostics.GetLogs().Should().Contain(log => log.Message.Contains("Click strict-mode fallback"));
+        strictLocator.VerifyAll();
+        interactiveLocator.VerifyAll();
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_ClickElement_RetriesWithInteractiveIdSelector_ForIdShorthand_OnStrictModeViolation()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var diagnostics = new DiagnosticsService();
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            diagnostics);
+
+        const string idSelector = "id=continue";
+        const string interactiveSelector = "input[id=\"continue\"], button[id=\"continue\"], a[id=\"continue\"], [role=\"button\"][id=\"continue\"]";
+
+        var strictLocator = new Mock<ILocator>(MockBehavior.Strict);
+        strictLocator
+            .Setup(candidate => candidate.ClickAsync(It.Is<LocatorClickOptions>(options => options.Timeout == 10000)))
+            .ThrowsAsync(new Exception("locator.click: strict mode violation"));
+        strictLocator
+            .Setup(candidate => candidate.ScreenshotAsync(It.IsAny<LocatorScreenshotOptions>()))
+            .ReturnsAsync(Array.Empty<byte>());
+
+        var interactiveLocator = new Mock<ILocator>(MockBehavior.Strict);
+        interactiveLocator
+            .Setup(candidate => candidate.ClickAsync(It.Is<LocatorClickOptions>(options => options.Timeout == 10000)))
+            .Returns(Task.CompletedTask);
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.Locator(idSelector, It.IsAny<PageLocatorOptions>()))
+            .Returns(strictLocator.Object);
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.Locator(interactiveSelector, It.IsAny<PageLocatorOptions>()))
+            .Returns(interactiveLocator.Object);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-click",
+                    SourceNodeId = "click-node",
+                    DisplayLabel = "Click",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "click-element",
+                    ActionParameters = new ClickElementActionParameters(idSelector, null, false, 10000),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-click",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        diagnostics.GetLogs().Should().Contain(log => log.Message.Contains("Click strict-mode fallback"));
+        strictLocator.VerifyAll();
+        interactiveLocator.VerifyAll();
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
     public async Task PrepareRunAsync_NavigateWithCredential_ResolvesCredential_And_Executes_WebAuth()
     {
         var runtimeExecutor = new StubFlowRuntimeExecutor();
@@ -242,7 +396,8 @@ public sealed class FlowExecutionBridgeTests
                         30000,
                         true,
                         credentialId.ToString(),
-                        "Contoso Login"),
+                        "Contoso Login",
+                        true),
                 },
             ],
             Edges =
@@ -321,7 +476,8 @@ public sealed class FlowExecutionBridgeTests
                         30000,
                         true,
                         credentialId.ToString(),
-                        "Contoso Login"),
+                        "Contoso Login",
+                        true),
                 },
             ],
             Edges =
@@ -408,7 +564,8 @@ public sealed class FlowExecutionBridgeTests
                         30000,
                         true,
                         credentialId.ToString(),
-                        "Basic Login"),
+                        "Basic Login",
+                        true),
                 },
             ],
             Edges =
@@ -507,7 +664,8 @@ public sealed class FlowExecutionBridgeTests
                         30000,
                         true,
                         credentialId.ToString(),
-                        "mTLS"),
+                        "mTLS",
+                        true),
                 },
             ],
             Edges =

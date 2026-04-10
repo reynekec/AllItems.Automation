@@ -41,7 +41,8 @@ public sealed record NavigateToUrlActionParameters(
     int TimeoutMs = 30000,
     bool WaitUntilNetworkIdle = true,
     string? CredentialId = null,
-    string? CredentialName = null) : ActionParameters;
+    string? CredentialName = null,
+    bool EnableAuthentication = false) : ActionParameters;
 
 public sealed record GoBackActionParameters(
     int TimeoutMs = 10000) : ActionParameters;

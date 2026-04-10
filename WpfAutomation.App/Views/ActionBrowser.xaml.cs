@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,8 +6,11 @@ using WpfAutomation.App.Models;
 
 namespace WpfAutomation.App.Views;
 
-public partial class ActionBrowser : UserControl
+public partial class ActionBrowser
 {
+    private const string BrowserAutomationRootCategoryId = "browser-automation";
+    private const string BrowserAutomationRootCategoryName = "Browser Automation";
+
     private Point _dragStartPoint;
     private UiActionItem? _dragCandidate;
     private bool _isDragging;
@@ -170,7 +171,7 @@ public partial class ActionBrowser : UserControl
 
     private void RefreshFilteredCategories()
     {
-        var search = SearchText?.Trim() ?? string.Empty;
+        var search = SearchText.Trim();
         var categories = CategoriesSource ?? [];
 
         var filtered = new List<UiActionCategory>();
@@ -190,7 +191,21 @@ public partial class ActionBrowser : UserControl
             });
         }
 
-        FilteredCategoriesSource = filtered;
+        if (filtered.Count == 0)
+        {
+            FilteredCategoriesSource = filtered;
+            return;
+        }
+
+        FilteredCategoriesSource =
+        [
+            new UiActionCategory
+            {
+                CategoryId = BrowserAutomationRootCategoryId,
+                CategoryName = BrowserAutomationRootCategoryName,
+                ChildCategories = new ObservableCollection<UiActionCategory>(filtered),
+            },
+        ];
     }
 
     private static bool MatchesSearch(UiActionItem action, string search)
@@ -212,6 +227,12 @@ public partial class ActionBrowser : UserControl
     {
         if (sender is not TreeViewItem { DataContext: UiActionCategory category } treeItem)
         {
+            return;
+        }
+
+        if (category.CategoryId == BrowserAutomationRootCategoryId)
+        {
+            treeItem.IsExpanded = true;
             return;
         }
 

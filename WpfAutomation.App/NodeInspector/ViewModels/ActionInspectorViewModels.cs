@@ -544,6 +544,7 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
     private string? _credentialPickerStateMessage;
     private string? _credentialWarningMessage;
     private int _credentialWarningRefreshVersion;
+    private InspectorFieldViewModel? _enableAuthenticationField;
 
     public NavigateToUrlInspectorViewModel(
         NavigateToUrlActionParameters current,
@@ -557,7 +558,7 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
         _credentialStore = credentialStore;
         OpenCredentialManagerCommand = new RelayCommand(OpenCredentialManager);
         ClearCredentialCommand = new RelayCommand(ClearCredential);
-        _isCredentialPickerEnabled = _credentialStore is not null && _credentialStore.IsUnlocked;
+        _isCredentialPickerEnabled = TryIsCredentialStoreUnlocked(_credentialStore);
 
         foreach (var hiddenFieldName in HiddenFieldNames)
         {
@@ -568,10 +569,18 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
             }
         }
 
+        _enableAuthenticationField = FindOptionalField(nameof(NavigateToUrlActionParameters.EnableAuthentication));
+        if (_enableAuthenticationField is not null)
+        {
+            _enableAuthenticationField.PropertyChanged += EnableAuthenticationFieldPropertyChanged;
+        }
+
         AppCrashLogger.Info("NavigateToUrl inspector created.");
         RefreshCredentialWarning();
         _ = LoadCredentialOptionsAsync();
     }
+
+    public bool IsAuthenticationSectionVisible => _enableAuthenticationField?.BoolValue == true;
 
     public ICommand OpenCredentialManagerCommand { get; }
 
@@ -733,16 +742,16 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
             return;
         }
 
-        if (!_credentialStore.IsUnlocked)
-        {
-            IsCredentialPickerEnabled = false;
-            CredentialPickerStateMessage = "Unlock credentials to search and select saved credentials.";
-            ReplaceCredentialOptions([]);
-            return;
-        }
-
         try
         {
+            if (!_credentialStore.IsUnlocked)
+            {
+                IsCredentialPickerEnabled = false;
+                CredentialPickerStateMessage = "Unlock credentials to search and select saved credentials.";
+                ReplaceCredentialOptions([]);
+                return;
+            }
+
             var entries = await _credentialStore.LoadAllAsync();
             var mapped = entries
                 .Select(MapCredentialPickerItem)
@@ -762,6 +771,24 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
             IsCredentialPickerEnabled = false;
             CredentialPickerStateMessage = "Unable to load credentials right now.";
             ReplaceCredentialOptions([]);
+        }
+    }
+
+    private static bool TryIsCredentialStoreUnlocked(ICredentialStore? credentialStore)
+    {
+        if (credentialStore is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return credentialStore.IsUnlocked;
+        }
+        catch (Exception exception)
+        {
+            AppCrashLogger.Error("NavigateToUrl inspector: failed to read credential store state.", exception);
+            return false;
         }
     }
 
@@ -862,6 +889,12 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
 
     private async Task RefreshCredentialWarningAsync(int refreshVersion)
     {
+        if (!IsAuthenticationSectionVisible)
+        {
+            ApplyCredentialWarningMessage(refreshVersion, null);
+            return;
+        }
+
         var credentialIdField = FindOptionalField("CredentialId");
         if (credentialIdField is null || string.IsNullOrWhiteSpace(credentialIdField.StringValue))
         {
@@ -905,6 +938,17 @@ public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewMod
         }
 
         CredentialWarningMessage = message;
+    }
+
+    private void EnableAuthenticationFieldPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (!string.Equals(eventArgs.PropertyName, nameof(InspectorFieldViewModel.BoolValue), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsAuthenticationSectionVisible));
+        RefreshCredentialWarning();
     }
 
     private InspectorFieldViewModel? FindOptionalField(string name)
@@ -1085,9 +1129,16 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
 
         try
         {
-            var parsedSelector = ParseSelector(FindField("Selector").StringValue);
+            var selectorField = FindField("Selector");
+            var parsedSelector = ParseSelector(selectorField.StringValue);
             _selectedSelectorMode = parsedSelector.Mode;
             _selectorInputValue = parsedSelector.Value;
+
+            var normalizedSelector = BuildSelector(_selectedSelectorMode, _selectorInputValue);
+            if (!string.Equals(selectorField.StringValue, normalizedSelector, StringComparison.Ordinal))
+            {
+                selectorField.StringValue = normalizedSelector;
+            }
 
             OnPropertyChanged(nameof(SelectedSelectorMode));
             OnPropertyChanged(nameof(SelectorInputValue));
@@ -1300,6 +1351,11 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
 
     private static string BuildClassSelector(string inputValue)
     {
+        if (LooksLikeCssSelector(inputValue))
+        {
+            return inputValue.Trim();
+        }
+
         var classTokens = inputValue
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(token => token.TrimStart('.'))
@@ -1312,6 +1368,11 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
         }
 
         return string.Concat(classTokens.Select(token => $"[class~=\"{EscapeCssAttributeValue(token)}\"]"));
+    }
+
+    private static bool LooksLikeCssSelector(string inputValue)
+    {
+        return inputValue.IndexOfAny(['[', ']', '#', '=', '>', '+', '~', ':']) >= 0;
     }
 
     private static string BuildAttributeSelector(string attributeName, string attributeValue)
@@ -1499,9 +1560,16 @@ public sealed class FillInputInspectorViewModel : JsonActionInspectorViewModelBa
 
         try
         {
-            var parsedSelector = ParseSelector(FindField("Selector").StringValue);
+            var selectorField = FindField("Selector");
+            var parsedSelector = ParseSelector(selectorField.StringValue);
             _selectedSelectorMode = parsedSelector.Mode;
             _selectorInputValue = parsedSelector.Value;
+
+            var normalizedSelector = BuildSelector(_selectedSelectorMode, _selectorInputValue);
+            if (!string.Equals(selectorField.StringValue, normalizedSelector, StringComparison.Ordinal))
+            {
+                selectorField.StringValue = normalizedSelector;
+            }
 
             OnPropertyChanged(nameof(SelectedSelectorMode));
             OnPropertyChanged(nameof(SelectorInputValue));
@@ -1685,13 +1753,17 @@ public sealed class FillInputInspectorViewModel : JsonActionInspectorViewModelBa
             SelectorById => BuildAttributeSelector("id", trimmed.TrimStart('#')),
             SelectorByClass => BuildClassSelector(trimmed),
             SelectorByName => BuildAttributeSelector("name", trimmed),
-            SelectorByTag => trimmed,
             _ => trimmed,
         };
     }
 
     private static string BuildClassSelector(string inputValue)
     {
+        if (LooksLikeCssSelector(inputValue))
+        {
+            return inputValue.Trim();
+        }
+
         var classTokens = inputValue
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(token => token.TrimStart('.'))
@@ -1704,6 +1776,11 @@ public sealed class FillInputInspectorViewModel : JsonActionInspectorViewModelBa
         }
 
         return string.Concat(classTokens.Select(token => $"[class~=\"{EscapeCssAttributeValue(token)}\"]"));
+    }
+
+    private static bool LooksLikeCssSelector(string inputValue)
+    {
+        return inputValue.IndexOfAny(['[', ']', '#', '=', '>', '+', '~', ':']) >= 0;
     }
 
     private static string BuildAttributeSelector(string attributeName, string attributeValue)

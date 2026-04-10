@@ -11,5 +11,11 @@ public sealed class UiActionCategory
 
     public string CategoryName { get; init; } = string.Empty;
 
+    public ObservableCollection<UiActionCategory> ChildCategories { get; init; } = [];
+
     public ObservableCollection<UiActionItem> Actions { get; init; } = [];
+
+    public IEnumerable<object> Items => ChildCategories.Count > 0
+        ? ChildCategories
+        : Actions;
 }

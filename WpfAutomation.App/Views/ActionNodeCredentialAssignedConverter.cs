@@ -11,7 +11,7 @@ public sealed class ActionNodeCredentialAssignedConverter : IValueConverter
     {
         if (value is NavigateToUrlActionParameters navigateParameters)
         {
-            return string.IsNullOrWhiteSpace(navigateParameters.CredentialId)
+            return !navigateParameters.EnableAuthentication || string.IsNullOrWhiteSpace(navigateParameters.CredentialId)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         }

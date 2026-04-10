@@ -84,27 +84,29 @@
                               Style="{StaticResource ActionsSidebarTreeViewStyle}"
                               PreviewMouseWheel="CategoryTree_OnPreviewMouseWheel"
                               ItemsSource="{Binding FilteredCategoriesSource, ElementName=Root}">
+                        <TreeView.Resources>
+                            <HierarchicalDataTemplate x:Key="CategoryTreeTemplate"
+                                                      DataType="{x:Type models:UiActionCategory}"
+                                                      ItemsSource="{Binding Items}">
+                                <TextBlock Style="{StaticResource ActionsSidebarCategoryHeaderTextStyle}"
+                                           Text="{Binding CategoryName}"
+                                           PreviewMouseLeftButtonUp="CategoryHeader_OnPreviewMouseLeftButtonUp" />
+                            </HierarchicalDataTemplate>
+                            <DataTemplate DataType="{x:Type models:UiActionItem}">
+                                <Button Content="{Binding DisplayName}"
+                                        Style="{StaticResource ActionsSidebarActionButtonStyle}"
+                                        Click="ActionInvokeButton_OnClick"
+                                        PreviewMouseLeftButtonDown="ActionInvokeButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="ActionInvokeButton_OnPreviewMouseLeftButtonUp"
+                                        PreviewMouseMove="ActionInvokeButton_OnPreviewMouseMove" />
+                            </DataTemplate>
+                        </TreeView.Resources>
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem"
                                    BasedOn="{StaticResource ActionsSidebarTreeViewItemContainerStyle}" />
                         </TreeView.ItemContainerStyle>
                         <TreeView.ItemTemplate>
-                            <HierarchicalDataTemplate DataType="{x:Type models:UiActionCategory}" ItemsSource="{Binding Actions}">
-                                <TextBlock Style="{StaticResource ActionsSidebarCategoryHeaderTextStyle}"
-                                           Text="{Binding CategoryName}"
-                                           PreviewMouseLeftButtonUp="CategoryHeader_OnPreviewMouseLeftButtonUp" />
-                                <HierarchicalDataTemplate.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type models:UiActionItem}">
-                                        <Button Content="{Binding DisplayName}"
-                                                Style="{StaticResource ActionsSidebarActionButtonStyle}"
-                                                HorizontalAlignment="Stretch"
-                                                Click="ActionInvokeButton_OnClick"
-                                                PreviewMouseLeftButtonDown="ActionInvokeButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="ActionInvokeButton_OnPreviewMouseLeftButtonUp"
-                                                PreviewMouseMove="ActionInvokeButton_OnPreviewMouseMove" />
-                                    </DataTemplate>
-                                </HierarchicalDataTemplate.ItemTemplate>
-                            </HierarchicalDataTemplate>
+                            <StaticResource ResourceKey="CategoryTreeTemplate" />
                         </TreeView.ItemTemplate>
                     </TreeView>
                 </ScrollViewer>

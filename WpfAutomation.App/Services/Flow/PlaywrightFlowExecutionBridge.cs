@@ -9,6 +9,7 @@ using WpfAutomation.Core.Abstractions;
 using WpfAutomation.Core.Browser;
 using WpfAutomation.Core.Configuration;
 using WpfAutomation.Core.Diagnostics;
+using WpfAutomation.Core.Exceptions;
 
 namespace WpfAutomation.App.Services.Flow;
 
@@ -199,7 +200,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
     private async Task NavigateToUrlAsync(NavigateToUrlActionParameters parameters, bool forceHeaded, CancellationToken cancellationToken)
     {
         WebCredentialEntry? credential = null;
-        if (!string.IsNullOrWhiteSpace(parameters.CredentialId))
+        if (parameters.EnableAuthentication && !string.IsNullOrWhiteSpace(parameters.CredentialId))
         {
             credential = await ResolveWebCredentialAsync(parameters.CredentialId);
             await ApplyPreNavigationCredentialConfigurationAsync(credential, parameters.Url, forceHeaded, cancellationToken);
@@ -371,6 +372,95 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             : null;
     }
 
+    private static bool IsStrictModeViolation(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current.Message.Contains("strict mode", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryBuildInteractiveIdSelector(string selector, out string interactiveSelector)
+    {
+        interactiveSelector = string.Empty;
+        var trimmedSelector = selector.Trim();
+
+        var shorthandIdMatch = Regex.Match(
+            trimmedSelector,
+            "^id\\s*=\\s*['\"]?(?<id>[^'\"\\s]+)['\"]?$",
+            RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+        if (shorthandIdMatch.Success)
+        {
+            var shorthandId = shorthandIdMatch.Groups["id"].Value;
+            if (!string.IsNullOrWhiteSpace(shorthandId))
+            {
+                var escapedShorthandId = shorthandId.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+                interactiveSelector = $"input[id=\"{escapedShorthandId}\"], button[id=\"{escapedShorthandId}\"], a[id=\"{escapedShorthandId}\"], [role=\"button\"][id=\"{escapedShorthandId}\"]";
+                return true;
+            }
+        }
+
+        var idMatch = Regex.Match(
+            trimmedSelector,
+            "^\\s*\\[id\\s*=\\s*['\"]?(?<id>[^'\"\\]]+)['\"]?\\]\\s*$",
+            RegexOptions.CultureInvariant);
+
+        if (!idMatch.Success)
+        {
+            idMatch = Regex.Match(
+                trimmedSelector,
+                "^\\s*#(?<id>[^\\s]+)\\s*$",
+                RegexOptions.CultureInvariant);
+        }
+
+        if (!idMatch.Success)
+        {
+            return false;
+        }
+
+        var id = idMatch.Groups["id"].Value;
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return false;
+        }
+
+        var escaped = id.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        interactiveSelector = $"input[id=\"{escaped}\"], button[id=\"{escaped}\"], a[id=\"{escaped}\"], [role=\"button\"][id=\"{escaped}\"]";
+        return true;
+    }
+
+    private static string NormalizeSelectorForRuntime(string selector)
+    {
+        var trimmed = selector.Trim();
+
+        var match = Regex.Match(
+            trimmed,
+            "^\\[class~=\\\"(?<token>(?:\\\\.|[^\\\"])*)\\\"\\]$",
+            RegexOptions.CultureInvariant);
+
+        if (!match.Success)
+        {
+            return trimmed;
+        }
+
+        var token = match.Groups["token"].Value
+            .Replace("\\\"", "\"", StringComparison.Ordinal)
+            .Replace("\\\\", "\\", StringComparison.Ordinal);
+
+        if (token.IndexOfAny(['[', '#', '=', '>', '+', '~', ':']) < 0)
+        {
+            return trimmed;
+        }
+
+        return token;
+    }
+
     private async Task ClickElementAsync(ClickElementActionParameters parameters, CancellationToken cancellationToken)
     {
         EnsureUnsupportedParameter(string.IsNullOrWhiteSpace(parameters.FrameSelector), "click-element", "FrameSelector");
@@ -379,9 +469,38 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         var page = await RequirePageAsync(cancellationToken);
         await RequireActiveSession().WithTemporaryOptionsAsync(parameters.TimeoutMs, null, async () =>
         {
-            var element = page.Search().ByCss(parameters.Selector, cancellationToken);
-            await element.ClickAsync(cancellationToken);
+            await ClickWithIdStrictModeFallbackAsync(page, parameters.Selector, cancellationToken);
         });
+    }
+
+    private async Task ClickWithIdStrictModeFallbackAsync(IPageWrapper page, string selector, CancellationToken cancellationToken)
+    {
+        var normalizedSelector = NormalizeSelectorForRuntime(selector);
+        if (!string.Equals(selector, normalizedSelector, StringComparison.Ordinal))
+        {
+            _diagnosticsService.Warn($"Normalized selector -> {normalizedSelector}");
+        }
+
+        var element = page.Search().ByCss(normalizedSelector, cancellationToken);
+
+        try
+        {
+            await element.ClickAsync(cancellationToken);
+        }
+        catch (ElementInteractionException exception) when (TryBuildInteractiveIdSelector(normalizedSelector, out var interactiveSelector))
+        {
+            if (IsStrictModeViolation(exception))
+            {
+                _diagnosticsService.Warn($"Click strict-mode fallback -> {interactiveSelector}");
+            }
+            else
+            {
+                _diagnosticsService.Warn($"Click id fallback -> {interactiveSelector}");
+            }
+
+            var fallbackElement = page.Search().ByCss(interactiveSelector, cancellationToken);
+            await fallbackElement.ClickAsync(cancellationToken);
+        }
     }
 
     private async Task FillInputAsync(FillInputActionParameters parameters, CancellationToken cancellationToken)
