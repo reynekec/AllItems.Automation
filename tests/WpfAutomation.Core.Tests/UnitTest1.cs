@@ -137,6 +137,59 @@ public sealed class BrowserLifecycleTests
     }
 
     [Fact]
+    public async Task StartAsync_Applies_ContextCredentials_And_ClientCertificates()
+    {
+        var mockPlaywright = new Mock<IPlaywright>();
+        var mockChromium = new Mock<IBrowserType>();
+        var mockBrowser = new Mock<IBrowser>();
+        var mockContext = new Mock<IBrowserContext>();
+
+        mockPlaywright.SetupGet(playwright => playwright.Chromium).Returns(mockChromium.Object);
+        mockChromium
+            .Setup(browser => browser.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
+            .ReturnsAsync(mockBrowser.Object);
+        mockBrowser
+            .Setup(browser => browser.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
+            .ReturnsAsync(mockContext.Object);
+
+        var credentials = new HttpCredentials
+        {
+            Username = "alice",
+            Password = "secret",
+        };
+        var certificates = new[]
+        {
+            new ClientCertificate
+            {
+                Origin = "https://example.com",
+                CertPath = "cert.pem",
+                KeyPath = "key.pem",
+                Passphrase = "pass",
+            },
+        };
+
+        var launcher = new BrowserLauncher(AppBrowserType.Chromium, () => Task.FromResult(mockPlaywright.Object), new DiagnosticsService());
+
+        _ = await launcher.StartAsync(new BrowserOptions
+        {
+            Headless = true,
+            HttpCredentials = credentials,
+            ClientCertificates = certificates,
+        });
+
+        mockBrowser.Verify(browser => browser.NewContextAsync(
+            It.Is<BrowserNewContextOptions>(options =>
+                options.HttpCredentials == credentials &&
+                options.ClientCertificates != null &&
+                options.ClientCertificates.Count() == 1 &&
+                options.ClientCertificates.First().Origin == "https://example.com" &&
+                options.ClientCertificates.First().CertPath == "cert.pem" &&
+                options.ClientCertificates.First().KeyPath == "key.pem" &&
+                options.ClientCertificates.First().Passphrase == "pass")),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task NewPageAsync_CreatesWrappedPage()
     {
         var mockPlaywright = new Mock<IPlaywright>();

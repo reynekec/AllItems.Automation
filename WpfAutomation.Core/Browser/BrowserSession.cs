@@ -52,6 +52,13 @@ public sealed class BrowserSession : IAsyncDisposable
         return Task.FromResult((IReadOnlyList<IPageWrapper>)wrappedPages);
     }
 
+    public Task SetExtraHttpHeadersAsync(IEnumerable<KeyValuePair<string, string>> headers)
+    {
+        ArgumentNullException.ThrowIfNull(headers);
+        EnsureOpen();
+        return _context.SetExtraHTTPHeadersAsync(headers);
+    }
+
     public Task WithTemporaryOptionsAsync(int? timeoutMs, bool? navigationWaitUntilNetworkIdle, Func<Task> action)
     {
         ArgumentNullException.ThrowIfNull(action);

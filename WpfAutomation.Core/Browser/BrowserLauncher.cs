@@ -55,7 +55,23 @@ public sealed class BrowserLauncher : IBrowserLauncher
                 contextOptions.ViewportSize = ViewportSize.NoViewport;
             }
 
+            if (options.HttpCredentials is not null)
+            {
+                contextOptions.HttpCredentials = options.HttpCredentials;
+            }
+
+            if (options.ClientCertificates is { Count: > 0 })
+            {
+                contextOptions.ClientCertificates = [.. options.ClientCertificates];
+            }
+
             var context = await browser.NewContextAsync(contextOptions);
+
+            if (options.ExtraHttpHeaders is { Count: > 0 })
+            {
+                await context.SetExtraHTTPHeadersAsync(options.ExtraHttpHeaders);
+            }
+
             _diagnosticsService.Info("Launch complete");
 
             return new BrowserSession(playwright, browser, context, options, _diagnosticsService);

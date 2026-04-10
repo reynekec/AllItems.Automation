@@ -6,8 +6,12 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 using WpfAutomation.App.Commands;
+using WpfAutomation.App.Credentials;
+using WpfAutomation.App.Credentials.Models;
 using WpfAutomation.App.Models.Flow;
 using WpfAutomation.App.NodeInspector.Contracts;
+using WpfAutomation.App.Services.Credentials;
+using WpfAutomation.App.Services.Diagnostics;
 
 namespace WpfAutomation.App.NodeInspector.ViewModels;
 
@@ -25,6 +29,7 @@ public sealed class InspectorFieldViewModel : INotifyPropertyChanged
     private string _stringValue;
     private bool _boolValue;
     private string _selectedChoice;
+    private bool _isVisible;
 
     public InspectorFieldViewModel(
         string name,
@@ -42,6 +47,7 @@ public sealed class InspectorFieldViewModel : INotifyPropertyChanged
         _boolValue = boolValue;
         Choices = choices;
         _selectedChoice = stringValue;
+        _isVisible = true;
         _onValueChanged = onValueChanged;
     }
 
@@ -108,6 +114,21 @@ public sealed class InspectorFieldViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(StringValue));
             _onValueChanged();
+        }
+    }
+
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            if (_isVisible == value)
+            {
+                return;
+            }
+
+            _isVisible = value;
+            OnPropertyChanged();
         }
     }
 
@@ -506,8 +527,389 @@ public sealed class CloseBrowserInspectorViewModel : JsonActionInspectorViewMode
 
 public sealed class NavigateToUrlInspectorViewModel : JsonActionInspectorViewModelBase<NavigateToUrlActionParameters>
 {
-    public NavigateToUrlInspectorViewModel(NavigateToUrlActionParameters current, NavigateToUrlActionParameters defaults, Action<ActionParameters> commit)
-        : base("Navigate to URL", "Target", "Set the destination and timeout settings.", null, current, defaults, commit) { }
+    private static readonly IReadOnlyList<string> HiddenFieldNames =
+    [
+        "CredentialId",
+        "CredentialName",
+    ];
+
+    private readonly ICredentialManagerDialogService _credentialManagerDialogService;
+    private readonly ICredentialStore? _credentialStore;
+    private readonly ObservableCollection<CredentialPickerItem> _credentialOptions = [];
+    private readonly ObservableCollection<CredentialPickerItem> _filteredCredentialOptions = [];
+    private CredentialPickerItem? _selectedCredentialOption;
+    private string _credentialSearchText = string.Empty;
+    private bool _isSynchronizingCredentialSelection;
+    private bool _isCredentialPickerEnabled;
+    private string? _credentialPickerStateMessage;
+    private string? _credentialWarningMessage;
+    private int _credentialWarningRefreshVersion;
+
+    public NavigateToUrlInspectorViewModel(
+        NavigateToUrlActionParameters current,
+        NavigateToUrlActionParameters defaults,
+        Action<ActionParameters> commit,
+        ICredentialManagerDialogService? credentialManagerDialogService = null,
+        ICredentialStore? credentialStore = null)
+        : base("Navigate to URL", "Target", "Set the destination and timeout settings.", null, current, defaults, commit)
+    {
+        _credentialManagerDialogService = credentialManagerDialogService ?? new NullCredentialManagerDialogService();
+        _credentialStore = credentialStore;
+        OpenCredentialManagerCommand = new RelayCommand(OpenCredentialManager);
+        ClearCredentialCommand = new RelayCommand(ClearCredential);
+        _isCredentialPickerEnabled = _credentialStore is not null && _credentialStore.IsUnlocked;
+
+        foreach (var hiddenFieldName in HiddenFieldNames)
+        {
+            var field = FindOptionalField(hiddenFieldName);
+            if (field is not null)
+            {
+                field.IsVisible = false;
+            }
+        }
+
+        AppCrashLogger.Info("NavigateToUrl inspector created.");
+        RefreshCredentialWarning();
+        _ = LoadCredentialOptionsAsync();
+    }
+
+    public ICommand OpenCredentialManagerCommand { get; }
+
+    public ICommand ClearCredentialCommand { get; }
+
+    public IReadOnlyList<CredentialPickerItem> FilteredCredentialOptions => _filteredCredentialOptions;
+
+    public CredentialPickerItem? SelectedCredentialOption
+    {
+        get => _selectedCredentialOption;
+        set
+        {
+            if (ReferenceEquals(_selectedCredentialOption, value))
+            {
+                return;
+            }
+
+            _selectedCredentialOption = value;
+            OnPropertyChanged();
+
+            if (_isSynchronizingCredentialSelection || value is null)
+            {
+                return;
+            }
+
+            AssignCredentialSelection(value.Id, value.Name);
+            AppCrashLogger.Info($"NavigateToUrl inspector: credential selected from picker. Id={value.Id}");
+            RefreshCredentialWarning();
+        }
+    }
+
+    public string CredentialSearchText
+    {
+        get => _credentialSearchText;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (string.Equals(_credentialSearchText, next, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _credentialSearchText = next;
+            OnPropertyChanged();
+            RebuildFilteredCredentialOptions();
+        }
+    }
+
+    public bool IsCredentialPickerEnabled
+    {
+        get => _isCredentialPickerEnabled;
+        private set
+        {
+            if (_isCredentialPickerEnabled == value)
+            {
+                return;
+            }
+
+            _isCredentialPickerEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string? CredentialPickerStateMessage
+    {
+        get => _credentialPickerStateMessage;
+        private set
+        {
+            if (string.Equals(_credentialPickerStateMessage, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _credentialPickerStateMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasCredentialPickerStateMessage));
+        }
+    }
+
+    public bool HasCredentialPickerStateMessage => !string.IsNullOrWhiteSpace(CredentialPickerStateMessage);
+
+    public bool HasNoCredentialMatches => _credentialOptions.Count > 0 && _filteredCredentialOptions.Count == 0;
+
+    public string? CredentialWarningMessage
+    {
+        get => _credentialWarningMessage;
+        private set
+        {
+            if (string.Equals(_credentialWarningMessage, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _credentialWarningMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasCredentialWarning));
+        }
+    }
+
+    public bool HasCredentialWarning => !string.IsNullOrWhiteSpace(CredentialWarningMessage);
+
+    public string CredentialName
+    {
+        get
+        {
+            var field = FindOptionalField("CredentialName");
+            if (field is null || string.IsNullOrWhiteSpace(field.StringValue))
+            {
+                return "None";
+            }
+
+            return field.StringValue;
+        }
+    }
+
+    private void OpenCredentialManager()
+    {
+        AppCrashLogger.Info("NavigateToUrl inspector: open credential manager requested.");
+        var result = _credentialManagerDialogService.ShowDialog(selectedCredentialId: null, startWithNewCredential: true);
+        if (!result.Accepted || !result.SelectedCredentialId.HasValue || string.IsNullOrWhiteSpace(result.SelectedCredentialName))
+        {
+            AppCrashLogger.Info("NavigateToUrl inspector: credential selection canceled.");
+            return;
+        }
+
+        AssignCredentialSelection(result.SelectedCredentialId.Value, result.SelectedCredentialName);
+        AppCrashLogger.Info("NavigateToUrl inspector: credential assigned.");
+        RefreshCredentialWarning();
+        _ = LoadCredentialOptionsAsync(result.SelectedCredentialId.Value);
+    }
+
+    private void ClearCredential()
+    {
+        AppCrashLogger.Info("NavigateToUrl inspector: clear credential requested.");
+        var credentialIdField = FindOptionalField("CredentialId");
+        var credentialNameField = FindOptionalField("CredentialName");
+        if (credentialIdField is null || credentialNameField is null)
+        {
+            return;
+        }
+
+        credentialIdField.StringValue = string.Empty;
+        credentialNameField.StringValue = string.Empty;
+        OnPropertyChanged(nameof(CredentialName));
+        SetSelectedCredentialOption(null);
+        RefreshCredentialWarning();
+    }
+
+    private async Task LoadCredentialOptionsAsync(Guid? preferredCredentialId = null)
+    {
+        if (_credentialStore is null)
+        {
+            IsCredentialPickerEnabled = false;
+            CredentialPickerStateMessage = "Credential store is unavailable.";
+            ReplaceCredentialOptions([]);
+            return;
+        }
+
+        if (!_credentialStore.IsUnlocked)
+        {
+            IsCredentialPickerEnabled = false;
+            CredentialPickerStateMessage = "Unlock credentials to search and select saved credentials.";
+            ReplaceCredentialOptions([]);
+            return;
+        }
+
+        try
+        {
+            var entries = await _credentialStore.LoadAllAsync();
+            var mapped = entries
+                .Select(MapCredentialPickerItem)
+                .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            IsCredentialPickerEnabled = true;
+            CredentialPickerStateMessage = null;
+            ReplaceCredentialOptions(mapped);
+
+            var selectedId = preferredCredentialId ?? GetSelectedCredentialId();
+            SetSelectedCredentialOptionById(selectedId);
+        }
+        catch (Exception exception)
+        {
+            AppCrashLogger.Error("NavigateToUrl inspector: failed to load credential picker options.", exception);
+            IsCredentialPickerEnabled = false;
+            CredentialPickerStateMessage = "Unable to load credentials right now.";
+            ReplaceCredentialOptions([]);
+        }
+    }
+
+    private void ReplaceCredentialOptions(IEnumerable<CredentialPickerItem> items)
+    {
+        _credentialOptions.Clear();
+        foreach (var item in items)
+        {
+            _credentialOptions.Add(item);
+        }
+
+        RebuildFilteredCredentialOptions();
+    }
+
+    private void RebuildFilteredCredentialOptions()
+    {
+        var search = _credentialSearchText.Trim();
+
+        _filteredCredentialOptions.Clear();
+        foreach (var option in _credentialOptions)
+        {
+            if (search.Length == 0 || option.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                _filteredCredentialOptions.Add(option);
+            }
+        }
+
+        OnPropertyChanged(nameof(FilteredCredentialOptions));
+        OnPropertyChanged(nameof(HasNoCredentialMatches));
+    }
+
+    private void SetSelectedCredentialOptionById(Guid? credentialId)
+    {
+        CredentialPickerItem? selected = null;
+        if (credentialId.HasValue)
+        {
+            selected = _credentialOptions.FirstOrDefault(option => option.Id == credentialId.Value);
+        }
+
+        SetSelectedCredentialOption(selected);
+    }
+
+    private void SetSelectedCredentialOption(CredentialPickerItem? option)
+    {
+        _isSynchronizingCredentialSelection = true;
+        try
+        {
+            SelectedCredentialOption = option;
+        }
+        finally
+        {
+            _isSynchronizingCredentialSelection = false;
+        }
+    }
+
+    private Guid? GetSelectedCredentialId()
+    {
+        var credentialIdField = FindOptionalField("CredentialId");
+        if (credentialIdField is null || string.IsNullOrWhiteSpace(credentialIdField.StringValue))
+        {
+            return null;
+        }
+
+        return Guid.TryParse(credentialIdField.StringValue, out var parsed) ? parsed : null;
+    }
+
+    private void AssignCredentialSelection(Guid credentialId, string credentialName)
+    {
+        var credentialIdField = FindOptionalField("CredentialId");
+        var credentialNameField = FindOptionalField("CredentialName");
+        if (credentialIdField is null || credentialNameField is null)
+        {
+            return;
+        }
+
+        credentialIdField.StringValue = credentialId.ToString();
+        credentialNameField.StringValue = credentialName;
+        OnPropertyChanged(nameof(CredentialName));
+    }
+
+    private static CredentialPickerItem MapCredentialPickerItem(CredentialEntry entry)
+    {
+        var name = string.IsNullOrWhiteSpace(entry.Name) ? "(Unnamed credential)" : entry.Name.Trim();
+        var authType = entry switch
+        {
+            WebCredentialEntry web => WebAuthKindDisplayConverter.GetDisplayName(web.WebAuthKind),
+            _ => entry.AuthType.ToString(),
+        };
+
+        return new CredentialPickerItem(entry.Id, name, authType, $"{name} • {authType}");
+    }
+
+    private void RefreshCredentialWarning()
+    {
+        var refreshVersion = Interlocked.Increment(ref _credentialWarningRefreshVersion);
+        _ = RefreshCredentialWarningAsync(refreshVersion);
+    }
+
+    private async Task RefreshCredentialWarningAsync(int refreshVersion)
+    {
+        var credentialIdField = FindOptionalField("CredentialId");
+        if (credentialIdField is null || string.IsNullOrWhiteSpace(credentialIdField.StringValue))
+        {
+            ApplyCredentialWarningMessage(refreshVersion, null);
+            return;
+        }
+
+        if (!Guid.TryParse(credentialIdField.StringValue, out var credentialId))
+        {
+            ApplyCredentialWarningMessage(refreshVersion, "Credential reference is invalid. Please re-select.");
+            return;
+        }
+
+        try
+        {
+            if (_credentialStore is null || !_credentialStore.IsUnlocked)
+            {
+                ApplyCredentialWarningMessage(refreshVersion, null);
+                return;
+            }
+
+            var existing = await _credentialStore.GetByIdAsync(credentialId);
+            ApplyCredentialWarningMessage(
+                refreshVersion,
+                existing is null
+                ? "Credential not found. Please re-select."
+                : null);
+        }
+        catch (Exception exception)
+        {
+            AppCrashLogger.Error("NavigateToUrl inspector: credential warning refresh failed.", exception);
+            ApplyCredentialWarningMessage(refreshVersion, null);
+        }
+    }
+
+    private void ApplyCredentialWarningMessage(int refreshVersion, string? message)
+    {
+        if (refreshVersion != Volatile.Read(ref _credentialWarningRefreshVersion))
+        {
+            return;
+        }
+
+        CredentialWarningMessage = message;
+    }
+
+    private InspectorFieldViewModel? FindOptionalField(string name)
+    {
+        return Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.Ordinal));
+    }
+
+    public sealed record CredentialPickerItem(Guid Id, string Name, string AuthType, string DisplayText);
 }
 
 public sealed class GoBackInspectorViewModel : JsonActionInspectorViewModelBase<GoBackActionParameters>

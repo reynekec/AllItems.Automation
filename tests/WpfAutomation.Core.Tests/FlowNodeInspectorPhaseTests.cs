@@ -165,6 +165,65 @@ public sealed class FlowNodeInspectorPhaseTests
         viewModel.SelectedNodeInspector.DisplayKind.Should().Be(NodeInspectorDisplayKind.EdgeSelected);
     }
 
+    [Fact]
+    public async Task Persistence_RoundTrip_Preserves_NavigateToUrl_Credential_Reference()
+    {
+        var persistence = new FlowPersistenceService();
+        var tempFile = Path.Combine(Path.GetTempPath(), $"flow-credential-roundtrip-{Guid.NewGuid():N}.flow.json");
+
+        try
+        {
+            var nodeId = "node-credential";
+            var document = new FlowDocumentModel
+            {
+                DocumentId = "doc-credential",
+                DisplayName = "Credential Roundtrip",
+                RootLane = new FlowLaneModel
+                {
+                    LaneId = FlowLaneIdentifiers.RootLaneId,
+                    LaneKind = FlowLaneKind.Root,
+                    DisplayLabel = "Root",
+                    NodeIds = [nodeId],
+                },
+                Nodes =
+                [
+                    new FlowActionNodeModel
+                    {
+                        NodeId = nodeId,
+                        DisplayLabel = "Navigate",
+                        ActionReference = new FlowActionReferenceModel
+                        {
+                            ActionId = "navigate-to-url",
+                            CategoryId = "navigation",
+                            CategoryName = "Navigation",
+                        },
+                        ActionParameters = new NavigateToUrlActionParameters(
+                            "https://example.com",
+                            30000,
+                            true,
+                            "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042",
+                            "Contoso Login"),
+                    },
+                ],
+            };
+
+            await persistence.SaveAsync(document, tempFile);
+            var loaded = await persistence.OpenAsync(tempFile);
+
+            var loadedNavigate = loaded.Nodes.OfType<FlowActionNodeModel>().Single();
+            var loadedParameters = loadedNavigate.ActionParameters.Should().BeOfType<NavigateToUrlActionParameters>().Subject;
+            loadedParameters.CredentialId.Should().Be("3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042");
+            loadedParameters.CredentialName.Should().Be("Contoso Login");
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+            {
+                File.Delete(tempFile);
+            }
+        }
+    }
+
     private static UiActionDragRequest CreateRequest(string actionId)
     {
         return new UiActionDragRequest
@@ -184,7 +243,12 @@ public sealed class FlowNodeInspectorPhaseTests
             "open-browser" => new OpenBrowserActionParameters("firefox", false, 1234, 2),
             "new-page" => new NewPageActionParameters("https://example.org", false),
             "close-browser" => new CloseBrowserActionParameters(false),
-            "navigate-to-url" => new NavigateToUrlActionParameters("https://example.org/page", 9876, false),
+            "navigate-to-url" => new NavigateToUrlActionParameters(
+                "https://example.org/page",
+                9876,
+                false,
+                "3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042",
+                "Contoso Login"),
             "go-back" => new GoBackActionParameters(1111),
             "go-forward" => new GoForwardActionParameters(2222),
             "reload-page" => new ReloadPageActionParameters(true, 3333),

@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Microsoft.Playwright;
 using Moq;
+using WpfAutomation.App.Credentials.Models;
 using WpfAutomation.App.Models;
 using WpfAutomation.App.Models.Flow;
+using WpfAutomation.App.Services.Credentials;
 using WpfAutomation.App.Services.Flow;
 using WpfAutomation.Core.Abstractions;
 using WpfAutomation.Core.Browser;
@@ -162,6 +164,382 @@ public sealed class FlowExecutionBridgeTests
         await bridge.CloseActiveSessionAsync();
     }
 
+    [Fact]
+    public async Task PrepareRunAsync_NavigateWithCredential_ResolvesCredential_And_Executes_WebAuth()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var credentialStore = new Mock<ICredentialStore>(MockBehavior.Strict);
+        var webAuthExecutor = new Mock<IWebAuthExecutor>(MockBehavior.Strict);
+        var credentialId = Guid.Parse("3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042");
+
+        var credential = new WebCredentialEntry(
+            credentialId,
+            "Contoso Login",
+            WebAuthKind.UsernamePassword,
+            new Dictionary<string, string>
+            {
+                [WebCredentialEntry.FieldKeys.Username] = "alice",
+                [WebCredentialEntry.FieldKeys.Password] = "secret",
+            });
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.GotoAsync(
+                "https://example.com/",
+                It.IsAny<PageGotoOptions>()))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.TitleAsync())
+            .ReturnsAsync("Example");
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns("https://example.com/");
+
+        credentialStore
+            .Setup(store => store.GetByIdAsync(credentialId))
+            .ReturnsAsync(credential);
+
+        webAuthExecutor
+            .Setup(executor => executor.ExecuteAsync(
+                It.IsAny<IPageWrapper>(),
+                It.IsAny<BrowserSession>(),
+                It.Is<WebCredentialEntry>(entry => entry.Id == credentialId),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            masterPasswordService: null,
+            credentialStore: credentialStore.Object,
+            webAuthExecutor: webAuthExecutor.Object);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-navigate",
+                    SourceNodeId = "navigate-node",
+                    DisplayLabel = "Navigate",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "navigate-to-url",
+                    ActionParameters = new NavigateToUrlActionParameters(
+                        "https://example.com",
+                        30000,
+                        true,
+                        credentialId.ToString(),
+                        "Contoso Login"),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-navigate",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        credentialStore.VerifyAll();
+        webAuthExecutor.VerifyAll();
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_NavigateWithMissingCredential_Throws()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var credentialStore = new Mock<ICredentialStore>(MockBehavior.Strict);
+        var credentialId = Guid.Parse("3f5ef90e-f96e-4dc3-9bb8-ef4f4cdb2042");
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.GotoAsync(
+                "https://example.com/",
+                It.IsAny<PageGotoOptions>()))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.TitleAsync())
+            .ReturnsAsync("Example");
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns("https://example.com/");
+
+        credentialStore
+            .Setup(store => store.GetByIdAsync(credentialId))
+            .ReturnsAsync((CredentialEntry?)null);
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            masterPasswordService: null,
+            credentialStore: credentialStore.Object,
+            webAuthExecutor: null);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-navigate",
+                    SourceNodeId = "navigate-node",
+                    DisplayLabel = "Navigate",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "navigate-to-url",
+                    ActionParameters = new NavigateToUrlActionParameters(
+                        "https://example.com",
+                        30000,
+                        true,
+                        credentialId.ToString(),
+                        "Contoso Login"),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-navigate",
+                },
+            ],
+        };
+
+        var act = async () => await bridge.PrepareRunAsync(graph);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*was not found*");
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_NavigateWithHttpBasicAuth_Configures_ContextHttpCredentials_Before_Navigation()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var credentialStore = new Mock<ICredentialStore>(MockBehavior.Strict);
+        var webAuthExecutor = new Mock<IWebAuthExecutor>(MockBehavior.Strict);
+        var credentialId = Guid.Parse("fc2f9a02-bae7-4d8f-a7c7-2b90980ed463");
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.GotoAsync(
+                "https://example.com/",
+                It.IsAny<PageGotoOptions>()))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.TitleAsync())
+            .ReturnsAsync("Example");
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns("https://example.com/");
+
+        credentialStore
+            .Setup(store => store.GetByIdAsync(credentialId))
+            .ReturnsAsync(new WebCredentialEntry(
+                credentialId,
+                "Basic Login",
+                WebAuthKind.HttpBasicAuth,
+                new Dictionary<string, string>
+                {
+                    [WebCredentialEntry.FieldKeys.Username] = "alice",
+                    [WebCredentialEntry.FieldKeys.Password] = "secret",
+                }));
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            masterPasswordService: null,
+            credentialStore: credentialStore.Object,
+            webAuthExecutor: webAuthExecutor.Object);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-navigate",
+                    SourceNodeId = "navigate-node",
+                    DisplayLabel = "Navigate",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "navigate-to-url",
+                    ActionParameters = new NavigateToUrlActionParameters(
+                        "https://example.com",
+                        30000,
+                        true,
+                        credentialId.ToString(),
+                        "Basic Login"),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-navigate",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        launcherFactory.LastOptions.Should().NotBeNull();
+        launcherFactory.LastOptions!.HttpCredentials.Should().NotBeNull();
+        launcherFactory.LastOptions.HttpCredentials!.Username.Should().Be("alice");
+        launcherFactory.LastOptions.HttpCredentials.Password.Should().Be("secret");
+        webAuthExecutor.Verify(
+            executor => executor.ExecuteAsync(
+                It.IsAny<IPageWrapper>(),
+                It.IsAny<BrowserSession>(),
+                It.IsAny<WebCredentialEntry>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        await bridge.CloseActiveSessionAsync();
+    }
+
+    [Fact]
+    public async Task PrepareRunAsync_NavigateWithMtls_Configures_ContextClientCertificate_Before_Navigation()
+    {
+        var runtimeExecutor = new StubFlowRuntimeExecutor();
+        var launcherFactory = new RecordingBrowserLauncherFactory();
+        var credentialStore = new Mock<ICredentialStore>(MockBehavior.Strict);
+        var webAuthExecutor = new Mock<IWebAuthExecutor>(MockBehavior.Strict);
+        var credentialId = Guid.Parse("914d1a41-a5b0-4f15-a81a-45231b55f803");
+
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.GotoAsync(
+                "https://example.com/",
+                It.IsAny<PageGotoOptions>()))
+            .ReturnsAsync(Mock.Of<IResponse>());
+        launcherFactory.PageMock
+            .Setup(candidate => candidate.TitleAsync())
+            .ReturnsAsync("Example");
+        launcherFactory.PageMock
+            .SetupGet(candidate => candidate.Url)
+            .Returns("https://example.com/");
+
+        credentialStore
+            .Setup(store => store.GetByIdAsync(credentialId))
+            .ReturnsAsync(new WebCredentialEntry(
+                credentialId,
+                "mTLS",
+                WebAuthKind.CertificateMtls,
+                new Dictionary<string, string>
+                {
+                    [WebCredentialEntry.FieldKeys.CertificatePath] = "cert.pem",
+                    [WebCredentialEntry.FieldKeys.PrivateKeyPath] = "key.pem",
+                    [WebCredentialEntry.FieldKeys.CertificatePassword] = "passphrase",
+                }));
+
+        var bridge = new PlaywrightFlowExecutionBridge(
+            runtimeExecutor,
+            launcherFactory,
+            new BrowserOptions { Headless = true, TimeoutMs = 5000, RetryCount = 0 },
+            new DiagnosticsService(),
+            masterPasswordService: null,
+            credentialStore: credentialStore.Object,
+            webAuthExecutor: webAuthExecutor.Object);
+
+        var graph = new ExecutionFlowGraph
+        {
+            SchemaVersion = 1,
+            Nodes =
+            [
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-open",
+                    SourceNodeId = "open-node",
+                    DisplayLabel = "Open browser",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "open-browser",
+                    ActionParameters = new OpenBrowserActionParameters("chromium", false, 5000, 0),
+                },
+                new ExecutionFlowNode
+                {
+                    ExecutionNodeId = "exec-navigate",
+                    SourceNodeId = "navigate-node",
+                    DisplayLabel = "Navigate",
+                    NodeKind = FlowNodeKind.Action,
+                    ActionId = "navigate-to-url",
+                    ActionParameters = new NavigateToUrlActionParameters(
+                        "https://example.com",
+                        30000,
+                        true,
+                        credentialId.ToString(),
+                        "mTLS"),
+                },
+            ],
+            Edges =
+            [
+                new ExecutionFlowEdge
+                {
+                    FromExecutionNodeId = "exec-open",
+                    ToExecutionNodeId = "exec-navigate",
+                },
+            ],
+        };
+
+        await bridge.PrepareRunAsync(graph);
+
+        launcherFactory.LastOptions.Should().NotBeNull();
+        launcherFactory.LastOptions!.ClientCertificates.Should().NotBeNull();
+        launcherFactory.LastOptions.ClientCertificates!.Should().HaveCount(1);
+        launcherFactory.LastOptions.ClientCertificates[0].Origin.Should().Be("https://example.com");
+        launcherFactory.LastOptions.ClientCertificates[0].CertPath.Should().Be("cert.pem");
+        launcherFactory.LastOptions.ClientCertificates[0].KeyPath.Should().Be("key.pem");
+        launcherFactory.LastOptions.ClientCertificates[0].Passphrase.Should().Be("passphrase");
+        webAuthExecutor.Verify(
+            executor => executor.ExecuteAsync(
+                It.IsAny<IPageWrapper>(),
+                It.IsAny<BrowserSession>(),
+                It.IsAny<WebCredentialEntry>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        await bridge.CloseActiveSessionAsync();
+    }
+
     private static UiActionDragRequest CreateRequest(string actionId)
     {
         return new UiActionDragRequest
@@ -225,6 +603,9 @@ public sealed class FlowExecutionBridgeTests
                 NavigationWaitUntilNetworkIdle = options.NavigationWaitUntilNetworkIdle,
                 ScreenshotDirectory = options.ScreenshotDirectory,
                 InspectionExportDirectory = options.InspectionExportDirectory,
+                HttpCredentials = options.HttpCredentials,
+                ClientCertificates = options.ClientCertificates,
+                ExtraHttpHeaders = options.ExtraHttpHeaders,
             };
             _factory.LastOptions = sessionOptions;
 

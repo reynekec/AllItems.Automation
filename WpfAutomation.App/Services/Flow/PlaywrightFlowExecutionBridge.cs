@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using PlaywrightClientCertificate = Microsoft.Playwright.ClientCertificate;
+using PlaywrightHttpCredentials = Microsoft.Playwright.HttpCredentials;
+using WpfAutomation.App.Credentials.Models;
 using WpfAutomation.App.Models.Flow;
+using WpfAutomation.App.Services.Credentials;
 using WpfAutomation.Core.Abstractions;
 using WpfAutomation.Core.Browser;
 using WpfAutomation.Core.Configuration;
@@ -16,6 +20,10 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
     private readonly IBrowserLauncherFactory _browserLauncherFactory;
     private readonly BrowserOptions _baseBrowserOptions;
     private readonly DiagnosticsService _diagnosticsService;
+    private readonly IMasterPasswordService _masterPasswordService;
+    private readonly ICredentialStore? _credentialStore;
+    private readonly IWebAuthExecutor _webAuthExecutor;
+    private BrowserType _activeBrowserType = BrowserType.Chromium;
     private BrowserSession? _activeSession;
     private IPageWrapper? _currentPage;
 
@@ -23,17 +31,28 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         IFlowRuntimeExecutor runtimeExecutor,
         IBrowserLauncherFactory browserLauncherFactory,
         BrowserOptions baseBrowserOptions,
-        DiagnosticsService diagnosticsService)
+        DiagnosticsService diagnosticsService,
+        IMasterPasswordService? masterPasswordService = null,
+        ICredentialStore? credentialStore = null,
+        IWebAuthExecutor? webAuthExecutor = null)
     {
         _runtimeExecutor = runtimeExecutor;
         _browserLauncherFactory = browserLauncherFactory;
         _baseBrowserOptions = baseBrowserOptions;
         _diagnosticsService = diagnosticsService;
+        _masterPasswordService = masterPasswordService ?? new NullMasterPasswordService();
+        _credentialStore = credentialStore;
+        _webAuthExecutor = webAuthExecutor ?? new NullWebAuthExecutor();
     }
 
     public async Task PrepareRunAsync(ExecutionFlowGraph executionGraph, bool forceHeaded = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(executionGraph);
+
+        if (!_masterPasswordService.EnsureUnlockedBeforeRun())
+        {
+            throw new OperationCanceledException("Credential store unlock was cancelled by the user.");
+        }
 
         await CloseActiveSessionAsync();
 
@@ -145,6 +164,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         await CloseActiveSessionAsync();
 
         var browserType = ResolveBrowserType(parameters.BrowserEngine);
+        _activeBrowserType = browserType;
         var options = CreateBrowserOptions(parameters, forceHeaded);
         var launcher = _browserLauncherFactory.Create(browserType);
 
@@ -178,11 +198,177 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
 
     private async Task NavigateToUrlAsync(NavigateToUrlActionParameters parameters, bool forceHeaded, CancellationToken cancellationToken)
     {
+        WebCredentialEntry? credential = null;
+        if (!string.IsNullOrWhiteSpace(parameters.CredentialId))
+        {
+            credential = await ResolveWebCredentialAsync(parameters.CredentialId);
+            await ApplyPreNavigationCredentialConfigurationAsync(credential, parameters.Url, forceHeaded, cancellationToken);
+        }
+
         var page = await EnsurePageAsync(forceHeaded, cancellationToken);
-        _currentPage = await RequireActiveSession().WithTemporaryOptionsAsync(
+        var session = RequireActiveSession();
+        _currentPage = await session.WithTemporaryOptionsAsync(
             parameters.TimeoutMs,
             parameters.WaitUntilNetworkIdle,
             () => page.NavigateUrlAsync(parameters.Url, cancellationToken));
+
+        if (credential is not null && RequiresPostNavigationWebAuth(credential.WebAuthKind))
+        {
+            await _webAuthExecutor.ExecuteAsync(page, session, credential, cancellationToken);
+        }
+    }
+
+    private async Task<WebCredentialEntry> ResolveWebCredentialAsync(string credentialId)
+    {
+        if (_credentialStore is null)
+        {
+            throw new InvalidOperationException("Credential auth requires ICredentialStore, but no store was configured.");
+        }
+
+        if (!Guid.TryParse(credentialId, out var parsedCredentialId))
+        {
+            throw new InvalidOperationException($"Credential id '{credentialId}' is not a valid Guid.");
+        }
+
+        var credential = await _credentialStore.GetByIdAsync(parsedCredentialId);
+        if (credential is null)
+        {
+            throw new InvalidOperationException($"Credential '{parsedCredentialId}' was not found in the credential store.");
+        }
+
+        if (credential is not WebCredentialEntry webCredential)
+        {
+            throw new NotSupportedException($"Credential '{parsedCredentialId}' is not a supported web credential type.");
+        }
+
+        return webCredential;
+    }
+
+    private async Task ApplyPreNavigationCredentialConfigurationAsync(
+        WebCredentialEntry credential,
+        string targetUrl,
+        bool forceHeaded,
+        CancellationToken cancellationToken)
+    {
+        switch (credential.WebAuthKind)
+        {
+            case WebAuthKind.HttpBasicAuth:
+                await RebuildSessionForHttpBasicAuthAsync(credential, forceHeaded, cancellationToken);
+                return;
+            case WebAuthKind.ApiKeyBearer:
+                await ConfigureBearerHeaderAsync(credential, forceHeaded, cancellationToken);
+                return;
+            case WebAuthKind.CertificateMtls:
+                await RebuildSessionForMtlsAsync(credential, targetUrl, forceHeaded, cancellationToken);
+                return;
+            default:
+                return;
+        }
+    }
+
+    private async Task RebuildSessionForHttpBasicAuthAsync(
+        WebCredentialEntry credential,
+        bool forceHeaded,
+        CancellationToken cancellationToken)
+    {
+        var username = RequireCredentialField(credential, WebCredentialEntry.FieldKeys.Username);
+        var password = RequireCredentialField(credential, WebCredentialEntry.FieldKeys.Password);
+
+        var options = CloneBrowserOptions(forceHeaded);
+        options.HttpCredentials = new PlaywrightHttpCredentials
+        {
+            Username = username,
+            Password = password,
+        };
+
+        await RebuildSessionAsync(options, cancellationToken);
+    }
+
+    private async Task RebuildSessionForMtlsAsync(
+        WebCredentialEntry credential,
+        string targetUrl,
+        bool forceHeaded,
+        CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(targetUrl, UriKind.Absolute, out var parsedTargetUri))
+        {
+            throw new InvalidOperationException($"Target URL '{targetUrl}' is not a valid absolute URL for mTLS configuration.");
+        }
+
+        var certificatePath = RequireCredentialField(credential, WebCredentialEntry.FieldKeys.CertificatePath);
+        var certificatePassword = RequireCredentialField(credential, WebCredentialEntry.FieldKeys.CertificatePassword);
+        var privateKeyPath = GetCredentialField(credential, WebCredentialEntry.FieldKeys.PrivateKeyPath);
+
+        var certificate = new PlaywrightClientCertificate
+        {
+            Origin = parsedTargetUri.GetLeftPart(UriPartial.Authority),
+            Passphrase = certificatePassword,
+        };
+
+        if (!string.IsNullOrWhiteSpace(privateKeyPath))
+        {
+            certificate.CertPath = certificatePath;
+            certificate.KeyPath = privateKeyPath;
+        }
+        else
+        {
+            certificate.PfxPath = certificatePath;
+        }
+
+        var options = CloneBrowserOptions(forceHeaded);
+        options.ClientCertificates = [certificate];
+
+        await RebuildSessionAsync(options, cancellationToken);
+    }
+
+    private async Task ConfigureBearerHeaderAsync(
+        WebCredentialEntry credential,
+        bool forceHeaded,
+        CancellationToken cancellationToken)
+    {
+        var token = RequireCredentialField(credential, WebCredentialEntry.FieldKeys.Token);
+        var session = await EnsureSessionAsync(forceHeaded, cancellationToken);
+        await session.SetExtraHttpHeadersAsync(
+        [
+            new KeyValuePair<string, string>("Authorization", $"Bearer {token}"),
+        ]);
+    }
+
+    private async Task RebuildSessionAsync(BrowserOptions options, CancellationToken cancellationToken)
+    {
+        await CloseActiveSessionAsync();
+
+        var launcher = _browserLauncherFactory.Create(_activeBrowserType);
+        _activeSession = await launcher.StartAsync(options, cancellationToken);
+        _currentPage = null;
+    }
+
+    private static bool RequiresPostNavigationWebAuth(WebAuthKind webAuthKind)
+    {
+        return webAuthKind switch
+        {
+            WebAuthKind.HttpBasicAuth => false,
+            WebAuthKind.ApiKeyBearer => false,
+            WebAuthKind.CertificateMtls => false,
+            _ => true,
+        };
+    }
+
+    private static string RequireCredentialField(WebCredentialEntry credential, string key)
+    {
+        if (credential.Fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException($"Credential '{credential.Name}' is missing required field '{key}'.");
+    }
+
+    private static string? GetCredentialField(WebCredentialEntry credential, string key)
+    {
+        return credential.Fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
     }
 
     private async Task ClickElementAsync(ClickElementActionParameters parameters, CancellationToken cancellationToken)
@@ -297,7 +483,7 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             return _activeSession;
         }
 
-        var launcher = _browserLauncherFactory.Create(BrowserType.Chromium);
+        var launcher = _browserLauncherFactory.Create(_activeBrowserType);
         var options = CloneBrowserOptions(forceHeaded);
         _activeSession = await launcher.StartAsync(options, cancellationToken);
         return _activeSession;
@@ -372,6 +558,21 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
             NavigationWaitUntilNetworkIdle = _baseBrowserOptions.NavigationWaitUntilNetworkIdle,
             ScreenshotDirectory = _baseBrowserOptions.ScreenshotDirectory,
             InspectionExportDirectory = _baseBrowserOptions.InspectionExportDirectory,
+            HttpCredentials = _baseBrowserOptions.HttpCredentials is null
+                ? null
+                : new PlaywrightHttpCredentials
+                {
+                    Username = _baseBrowserOptions.HttpCredentials.Username,
+                    Password = _baseBrowserOptions.HttpCredentials.Password,
+                    Origin = _baseBrowserOptions.HttpCredentials.Origin,
+                    Send = _baseBrowserOptions.HttpCredentials.Send,
+                },
+            ClientCertificates = _baseBrowserOptions.ClientCertificates is null
+                ? null
+                : [.. _baseBrowserOptions.ClientCertificates],
+            ExtraHttpHeaders = _baseBrowserOptions.ExtraHttpHeaders is null
+                ? null
+                : [.. _baseBrowserOptions.ExtraHttpHeaders],
         };
     }
 
@@ -416,5 +617,13 @@ public sealed class PlaywrightFlowExecutionBridge : IFlowExecutionBridge
         }
 
         throw new TimeoutException(failureMessage);
+    }
+
+    private sealed class NullWebAuthExecutor : IWebAuthExecutor
+    {
+        public Task ExecuteAsync(IPageWrapper page, BrowserSession session, WebCredentialEntry credential, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Web auth execution requires IWebAuthExecutor, but no executor was configured.");
+        }
     }
 }

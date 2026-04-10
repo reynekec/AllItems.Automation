@@ -3,21 +3,34 @@ using WpfAutomation.App.NodeInspector.Contracts;
 using WpfAutomation.App.NodeInspector.Models;
 using WpfAutomation.App.Services.Flow;
 using WpfAutomation.App.NodeInspector.ViewModels;
+using WpfAutomation.App.Services.Credentials;
 
 namespace WpfAutomation.App.NodeInspector.Services;
 
 public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
 {
     private readonly IFlowActionParameterResolver _parameterResolver;
+    private readonly ICredentialManagerDialogService _credentialManagerDialogService;
+    private readonly ICredentialStore? _credentialStore;
 
     public DefaultNodeInspectorFactory()
-        : this(new FlowActionParameterResolver())
+        : this(new FlowActionParameterResolver(), new NullCredentialManagerDialogService(), null)
     {
     }
 
     public DefaultNodeInspectorFactory(IFlowActionParameterResolver parameterResolver)
+        : this(parameterResolver, new NullCredentialManagerDialogService(), null)
+    {
+    }
+
+    public DefaultNodeInspectorFactory(
+        IFlowActionParameterResolver parameterResolver,
+        ICredentialManagerDialogService credentialManagerDialogService,
+        ICredentialStore? credentialStore = null)
     {
         _parameterResolver = parameterResolver;
+        _credentialManagerDialogService = credentialManagerDialogService;
+        _credentialStore = credentialStore;
     }
 
     public INodeInspectorDescriptor CreateDescriptor(FlowActionNodeModel node)
@@ -46,7 +59,7 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
             "open-browser" => new OpenBrowserInspectorViewModel(Coerce<OpenBrowserActionParameters>(node.ActionParameters, defaults), (OpenBrowserActionParameters)defaults, commit),
             "new-page" => new NewPageInspectorViewModel(Coerce<NewPageActionParameters>(node.ActionParameters, defaults), (NewPageActionParameters)defaults, commit),
             "close-browser" => new CloseBrowserInspectorViewModel(Coerce<CloseBrowserActionParameters>(node.ActionParameters, defaults), (CloseBrowserActionParameters)defaults, commit),
-            "navigate-to-url" => new NavigateToUrlInspectorViewModel(Coerce<NavigateToUrlActionParameters>(node.ActionParameters, defaults), (NavigateToUrlActionParameters)defaults, commit),
+            "navigate-to-url" => new NavigateToUrlInspectorViewModel(Coerce<NavigateToUrlActionParameters>(node.ActionParameters, defaults), (NavigateToUrlActionParameters)defaults, commit, _credentialManagerDialogService, _credentialStore),
             "go-back" => new GoBackInspectorViewModel(Coerce<GoBackActionParameters>(node.ActionParameters, defaults), (GoBackActionParameters)defaults, commit),
             "go-forward" => new GoForwardInspectorViewModel(Coerce<GoForwardActionParameters>(node.ActionParameters, defaults), (GoForwardActionParameters)defaults, commit),
             "reload-page" => new ReloadPageInspectorViewModel(Coerce<ReloadPageActionParameters>(node.ActionParameters, defaults), (ReloadPageActionParameters)defaults, commit),

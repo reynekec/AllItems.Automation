@@ -1,3 +1,4 @@
+using Microsoft.Playwright;
 using System.ComponentModel.DataAnnotations;
 
 namespace WpfAutomation.Core.Configuration;
@@ -17,4 +18,10 @@ public sealed class BrowserOptions
     public string? ScreenshotDirectory { get; set; }
 
     public string? InspectionExportDirectory { get; set; }
+
+    public HttpCredentials? HttpCredentials { get; set; }
+
+    public IReadOnlyList<ClientCertificate>? ClientCertificates { get; set; }
+
+    public IReadOnlyList<KeyValuePair<string, string>>? ExtraHttpHeaders { get; set; }
 }

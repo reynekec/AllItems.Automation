@@ -22,7 +22,8 @@
                 <ItemsControl ItemsSource="{Binding Fields}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:InspectorFieldViewModel}">
-                            <StackPanel Margin="0,0,0,8">
+                            <StackPanel Margin="0,0,0,8"
+                                        Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Style="{StaticResource NodeInspector.RowLabelTextStyle}" Text="{Binding Label}" />
 
                                 <TextBox Text="{Binding StringValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">

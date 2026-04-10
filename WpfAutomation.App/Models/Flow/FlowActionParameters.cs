@@ -39,7 +39,9 @@ public sealed record CloseBrowserActionParameters(
 public sealed record NavigateToUrlActionParameters(
     string Url = "https://example.com",
     int TimeoutMs = 30000,
-    bool WaitUntilNetworkIdle = true) : ActionParameters;
+    bool WaitUntilNetworkIdle = true,
+    string? CredentialId = null,
+    string? CredentialName = null) : ActionParameters;
 
 public sealed record GoBackActionParameters(
     int TimeoutMs = 10000) : ActionParameters;

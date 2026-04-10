@@ -5,6 +5,8 @@ using WpfAutomation.App.Docking.Services;
 using WpfAutomation.App.NodeInspector.Contracts;
 using WpfAutomation.App.NodeInspector.Services;
 using WpfAutomation.App.Services;
+using WpfAutomation.App.Services.Credentials;
+using WpfAutomation.App.Services.Diagnostics;
 using WpfAutomation.App.Services.Flow;
 using WpfAutomation.App.ViewModels;
 using WpfAutomation.Core.Configuration;
@@ -18,18 +20,32 @@ public partial class App : Application
 
 	protected override void OnStartup(StartupEventArgs e)
 	{
-		base.OnStartup(e);
+		AppCrashLogger.Initialize();
+		AppCrashLogger.RegisterDispatcher(this);
 
-		var services = new ServiceCollection();
-		ConfigureServices(services);
-		_serviceProvider = services.BuildServiceProvider();
+		try
+		{
+			AppCrashLogger.Info("Application startup begin.");
+			base.OnStartup(e);
 
-		var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-		mainWindow.Show();
+			var services = new ServiceCollection();
+			ConfigureServices(services);
+			_serviceProvider = services.BuildServiceProvider();
+
+			var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+			mainWindow.Show();
+			AppCrashLogger.Info("Application startup complete.");
+		}
+		catch (Exception exception)
+		{
+			AppCrashLogger.Error("Startup failure.", exception);
+			throw;
+		}
 	}
 
 	protected override void OnExit(ExitEventArgs e)
 	{
+		AppCrashLogger.Info($"Application exit code: {e.ApplicationExitCode}");
 		_serviceProvider?.Dispose();
 		base.OnExit(e);
 	}
@@ -46,6 +62,10 @@ public partial class App : Application
 		services.AddSingleton(browserOptions);
 		services.AddSingleton<DiagnosticsService>();
 		services.AddSingleton(provider => new ScreenshotService(provider.GetRequiredService<BrowserOptions>()));
+		services.AddSingleton<ICredentialStore, CredentialStore>();
+		services.AddSingleton<ICredentialUnlockDialogService, CredentialUnlockDialogService>();
+		services.AddSingleton<ICredentialManagerDialogService, CredentialManagerDialogService>();
+		services.AddSingleton<IMasterPasswordService, MasterPasswordService>();
 		services.AddSingleton<IDockLayoutStateStore, InMemoryDockLayoutStateStore>();
 		services.AddSingleton<IDockLayoutPersistenceService>(_ => new DockLayoutPersistenceService(GetDockLayoutPath("main")));
 		services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
@@ -60,6 +80,7 @@ public partial class App : Application
 		services.AddSingleton<IFlowDocumentMapper<ExecutionFlowGraph>, FlowExecutionMapper>();
 		services.AddSingleton<IFlowRuntimeExecutor, FlowRuntimeExecutor>();
 		services.AddSingleton<IBrowserLauncherFactory, BrowserLauncherFactory>();
+		services.AddSingleton<IWebAuthExecutor, WebAuthExecutor>();
 		services.AddSingleton<IFlowExecutionBridge, PlaywrightFlowExecutionBridge>();
 		services.AddSingleton<INodeInspectorRuntimeBindingExtension, NullNodeInspectorRuntimeBindingExtension>();
 		services.AddSingleton<INodeInspectorFactory, DefaultNodeInspectorFactory>();
