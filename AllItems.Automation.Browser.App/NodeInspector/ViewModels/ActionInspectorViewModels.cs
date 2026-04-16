@@ -12,6 +12,7 @@ using AllItems.Automation.Browser.App.Models.Flow;
 using AllItems.Automation.Browser.App.NodeInspector.Contracts;
 using AllItems.Automation.Browser.App.Services.Credentials;
 using AllItems.Automation.Browser.App.Services.Diagnostics;
+using SelectorDemo.Wpf;
 
 namespace AllItems.Automation.Browser.App.NodeInspector.ViewModels;
 
@@ -989,6 +990,8 @@ public sealed class WaitForUserConfirmationInspectorViewModel : JsonActionInspec
         : base("Wait for user confirmation", "Automation", "Pause the flow and wait for the user to click Continue.", null, current, defaults, commit) { }
 }
 
+public sealed record ClickElementBrowserTargetOption(string NodeId, string DisplayName, string Url);
+
 public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewModelBase<ClickElementActionParameters>
 {
     private const string SelectorById = "Id";
@@ -1022,19 +1025,78 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
         "^[A-Za-z][A-Za-z0-9-]*$",
         RegexOptions.Compiled);
 
+    private readonly IReadOnlyList<ClickElementBrowserTargetOption> _browserTargets;
     private string _selectedSelectorMode = SelectorById;
     private string _selectorInputValue = string.Empty;
+    private ClickElementBrowserTargetOption? _selectedBrowserTarget;
+    private string _selectedElementTagName = string.Empty;
+    private string _selectedElementId = string.Empty;
+    private string _selectedElementName = string.Empty;
+    private string _selectedElementClassName = string.Empty;
+    private string _selectedElementCssSelector = string.Empty;
+    private string _selectedElementXPathSelector = string.Empty;
+    private string _selectedElementFrameUrl = string.Empty;
     private bool _isSynchronizingFromFields;
 
-    public ClickElementInspectorViewModel(ClickElementActionParameters current, ClickElementActionParameters defaults, Action<ActionParameters> commit)
+    public ClickElementInspectorViewModel(ClickElementActionParameters current, ClickElementActionParameters defaults, Action<ActionParameters> commit, IReadOnlyList<ClickElementBrowserTargetOption>? browserTargets = null)
         : base("Click element", "Target", "Choose how to target the element and set click timeout.", null, current, defaults, commit)
     {
+        _browserTargets = browserTargets ?? [];
+        _selectedBrowserTarget = _browserTargets.Count == 1 ? _browserTargets[0] : null;
         ClearUnsupportedOptionsCommand = new RelayCommand(ClearUnsupportedOptions);
         PropertyChanged += HandlePropertyChanged;
         SynchronizeFromFields();
     }
 
     public IReadOnlyList<string> SelectorModes => TargetingModes;
+
+    public IReadOnlyList<ClickElementBrowserTargetOption> BrowserTargets => _browserTargets;
+
+    public ClickElementBrowserTargetOption? SelectedBrowserTarget
+    {
+        get => _selectedBrowserTarget;
+        set
+        {
+            if (EqualityComparer<ClickElementBrowserTargetOption?>.Default.Equals(_selectedBrowserTarget, value))
+            {
+                return;
+            }
+
+            _selectedBrowserTarget = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedBrowserTargetUrl));
+            OnPropertyChanged(nameof(CanOpenBrowserWindow));
+            OnPropertyChanged(nameof(BrowserTargetHelpText));
+        }
+    }
+
+    public string SelectedBrowserTargetUrl => SelectedBrowserTarget?.Url ?? string.Empty;
+
+    public bool HasBrowserTargets => BrowserTargets.Count > 0;
+
+    public bool CanOpenBrowserWindow => SelectedBrowserTarget is not null;
+
+    public string BrowserTargetHelpText => BrowserTargets.Count switch
+    {
+        0 => "Add a Navigate to URL or New Page node with a URL to use Browser Window.",
+        1 => $"Browser Window will use {BrowserTargets[0].DisplayName}.",
+        _ when SelectedBrowserTarget is null => "Select which flow navigation node Browser Window should open.",
+        _ => $"Browser Window will use {SelectedBrowserTarget!.DisplayName}.",
+    };
+
+    public string SelectedElementTagName => FormatSelectedElementValue(_selectedElementTagName);
+
+    public string SelectedElementId => FormatSelectedElementValue(_selectedElementId);
+
+    public string SelectedElementName => FormatSelectedElementValue(_selectedElementName);
+
+    public string SelectedElementClassName => FormatSelectedElementValue(_selectedElementClassName);
+
+    public string SelectedElementCssSelector => FormatSelectedElementValue(_selectedElementCssSelector);
+
+    public string SelectedElementXPathSelector => FormatSelectedElementValue(_selectedElementXPathSelector);
+
+    public string SelectedElementFrameUrl => FormatSelectedElementValue(_selectedElementFrameUrl);
 
     public string SelectedSelectorMode
     {
@@ -1154,6 +1216,12 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
             OnPropertyChanged(nameof(TimeoutMs));
             OnPropertyChanged(nameof(HasUnsupportedOptions));
             OnPropertyChanged(nameof(UnsupportedOptionsMessage));
+            OnPropertyChanged(nameof(BrowserTargets));
+            OnPropertyChanged(nameof(SelectedBrowserTarget));
+            OnPropertyChanged(nameof(SelectedBrowserTargetUrl));
+            OnPropertyChanged(nameof(HasBrowserTargets));
+            OnPropertyChanged(nameof(CanOpenBrowserWindow));
+            OnPropertyChanged(nameof(BrowserTargetHelpText));
         }
         finally
         {
@@ -1194,6 +1262,51 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
 
         OnPropertyChanged(nameof(HasUnsupportedOptions));
         OnPropertyChanged(nameof(UnsupportedOptionsMessage));
+    }
+
+    public void ApplySelectedElement(BrowserElementSelection selection)
+    {
+        _selectedElementTagName = selection.TagName;
+        _selectedElementId = selection.ElementId;
+        _selectedElementName = selection.ElementName;
+        _selectedElementClassName = selection.ClassName;
+        _selectedElementCssSelector = selection.CssSelector;
+        _selectedElementXPathSelector = selection.XPathSelector;
+        _selectedElementFrameUrl = selection.FrameUrl;
+
+        if (!string.IsNullOrWhiteSpace(selection.ElementId))
+        {
+            SelectedSelectorMode = SelectorById;
+            SelectorInputValue = selection.ElementId;
+        }
+        else if (!string.IsNullOrWhiteSpace(selection.ElementName))
+        {
+            SelectedSelectorMode = SelectorByName;
+            SelectorInputValue = selection.ElementName;
+        }
+        else if (!string.IsNullOrWhiteSpace(selection.ClassName))
+        {
+            SelectedSelectorMode = SelectorByClass;
+            SelectorInputValue = NormalizeClassValue(selection.ClassName);
+        }
+        else if (!string.IsNullOrWhiteSpace(selection.TagName))
+        {
+            SelectedSelectorMode = SelectorByTag;
+            SelectorInputValue = selection.TagName;
+        }
+        else
+        {
+            SelectedSelectorMode = SelectorByCss;
+            SelectorInputValue = selection.CssSelector;
+        }
+
+        OnPropertyChanged(nameof(SelectedElementTagName));
+        OnPropertyChanged(nameof(SelectedElementId));
+        OnPropertyChanged(nameof(SelectedElementName));
+        OnPropertyChanged(nameof(SelectedElementClassName));
+        OnPropertyChanged(nameof(SelectedElementCssSelector));
+        OnPropertyChanged(nameof(SelectedElementXPathSelector));
+        OnPropertyChanged(nameof(SelectedElementFrameUrl));
     }
 
     private InspectorFieldViewModel FindField(string name)
@@ -1398,6 +1511,17 @@ public sealed class ClickElementInspectorViewModel : JsonActionInspectorViewMode
         return value
             .Replace("\\\"", "\"", StringComparison.Ordinal)
             .Replace("\\\\", "\\", StringComparison.Ordinal);
+    }
+
+    private static string NormalizeClassValue(string className)
+    {
+        return string.Join(" ", className
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static string FormatSelectedElementValue(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "(none)" : value;
     }
 }
 

@@ -47,7 +47,7 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
         };
     }
 
-    public INodeInspectorViewModel CreateInspector(FlowActionNodeModel node, Action<ActionParameters> commit)
+    public INodeInspectorViewModel CreateInspector(FlowActionNodeModel node, IReadOnlyList<ClickElementBrowserTargetOption> browserTargets, Action<ActionParameters> commit)
     {
         // When adding a new action inspector:
         // 1) Add its ActionParameters record in FlowActionParameters.cs
@@ -69,7 +69,7 @@ public sealed class DefaultNodeInspectorFactory : INodeInspectorFactory
             "reload-page" => new ReloadPageInspectorViewModel(Coerce<ReloadPageActionParameters>(node.ActionParameters, defaults), (ReloadPageActionParameters)defaults, commit),
             "wait-for-url" => new WaitForUrlInspectorViewModel(Coerce<WaitForUrlActionParameters>(node.ActionParameters, defaults), (WaitForUrlActionParameters)defaults, commit),
             "wait-for-user-confirmation" => new WaitForUserConfirmationInspectorViewModel(Coerce<WaitForUserConfirmationActionParameters>(node.ActionParameters, defaults), (WaitForUserConfirmationActionParameters)defaults, commit),
-            "click-element" => new ClickElementInspectorViewModel(Coerce<ClickElementActionParameters>(node.ActionParameters, defaults), (ClickElementActionParameters)defaults, commit),
+            "click-element" => new ClickElementInspectorViewModel(Coerce<ClickElementActionParameters>(node.ActionParameters, defaults), (ClickElementActionParameters)defaults, commit, browserTargets),
             "fill-input" => new FillInputInspectorViewModel(Coerce<FillInputActionParameters>(node.ActionParameters, defaults), (FillInputActionParameters)defaults, commit),
             "hover-element" => new HoverElementInspectorViewModel(Coerce<HoverElementActionParameters>(node.ActionParameters, defaults), (HoverElementActionParameters)defaults, commit),
             "press-key" => new PressKeyInspectorViewModel(Coerce<PressKeyActionParameters>(node.ActionParameters, defaults), (PressKeyActionParameters)defaults, commit),

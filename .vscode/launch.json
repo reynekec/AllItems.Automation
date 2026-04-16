@@ -5,10 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Launch WpfAutomation.App",
+            "name": ".NET Launch AllItems.Automation.Browser.App",
             "type": "dotnet",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/WpfAutomation.App/WpfAutomation.App.csproj"
+            "preLaunchTask": "build-browser-app",
+            "projectPath": "${workspaceFolder}/AllItems.Automation.Browser.App/AllItems.Automation.Browser.App.csproj"
+        },
+        {
+            "name": ".NET Core Launch AllItems.Automation.Browser.App (coreclr)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-browser-app",
+            "program": "${workspaceFolder}/AllItems.Automation.Browser.App/bin/Debug/net9.0-windows/AllItems.Automation.Browser.App.exe",
+            "cwd": "${workspaceFolder}/AllItems.Automation.Browser.App",
+            "console": "internalConsole",
+            "stopAtEntry": false
         }
     ]
 }

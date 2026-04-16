@@ -8,10 +8,12 @@ using Microsoft.Win32;
 using AllItems.Automation.Browser.App.Commands;
 using AllItems.Automation.Browser.App.Models;
 using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.NodeInspector.ViewModels;
 using AllItems.Automation.Browser.App.NodeInspector.Contracts;
 using AllItems.Automation.Browser.App.NodeInspector.Models;
 using AllItems.Automation.Browser.App.NodeInspector.Services;
 using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.App.Services.Diagnostics;
 using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace AllItems.Automation.Browser.App.ViewModels;
@@ -600,34 +602,63 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
 
     private async Task OpenAsync()
     {
+        AppCrashLogger.Info("OpenAsync: begin.");
+
+        var mainWindow = Application.Current?.MainWindow;
+        AppCrashLogger.Info($"OpenAsync: MainWindow={mainWindow?.GetType().Name ?? "null"}, IsLoaded={mainWindow?.IsLoaded}, Visibility={mainWindow?.Visibility}, WindowState={mainWindow?.WindowState}.");
+
         var dialog = new OpenFileDialog
         {
             Filter = "Flow JSON (*.flow.json)|*.flow.json|JSON (*.json)|*.json|All files (*.*)|*.*",
             Multiselect = false,
         };
 
-        if (!await ShowDialogWithWaitCursorAsync(dialog))
+        AppCrashLogger.Info("OpenAsync: showing file dialog.");
+        bool picked;
+        try
         {
+            picked = await ShowDialogWithWaitCursorAsync(dialog);
+        }
+        catch (Exception ex)
+        {
+            AppCrashLogger.Error("OpenAsync: file dialog threw.", ex);
+            throw;
+        }
+
+        AppCrashLogger.Info($"OpenAsync: dialog result={picked}. MainWindow after dialog: WindowState={mainWindow?.WindowState}, IsActive={mainWindow?.IsActive}.");
+
+        if (!picked)
+        {
+            AppCrashLogger.Info("OpenAsync: user cancelled.");
             return;
         }
+
+        AppCrashLogger.Info($"OpenAsync: loading file '{dialog.FileName}'.");
 
         try
         {
             var loaded = await _persistenceService.OpenAsync(dialog.FileName);
+            AppCrashLogger.Info($"OpenAsync: file loaded. Nodes={loaded.Nodes.Count}, Edges={loaded.Edges.Count}.");
+
             var validation = FlowDocumentValidator.Validate(loaded);
             if (!validation.IsValid)
             {
                 _diagnosticsService.Warn("Loaded flow has validation warnings.", new Dictionary<string, string> { ["errors"] = string.Join(" | ", validation.Errors) });
+                AppCrashLogger.Info($"OpenAsync: validation warnings: {string.Join(" | ", validation.Errors)}");
             }
 
+            AppCrashLogger.Info("OpenAsync: assigning Document.");
             _undoStack.Push(Document);
             _redoStack.Clear();
             Document = loaded;
+            AppCrashLogger.Info("OpenAsync: Document assigned.");
             SetCurrentDocumentPath(dialog.FileName);
             _diagnosticsService.Info($"Opened flow document from '{dialog.FileName}'.");
+            AppCrashLogger.Info("OpenAsync: complete.");
         }
         catch (Exception exception)
         {
+            AppCrashLogger.Error($"OpenAsync: failed to load '{dialog.FileName}'.", exception);
             _diagnosticsService.Error($"Failed to open flow document '{dialog.FileName}'.", exception);
         }
     }
@@ -638,33 +669,46 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         var tcs = new TaskCompletionSource<bool>();
 
         Mouse.OverrideCursor = Cursors.Wait;
+        AppCrashLogger.Info("ShowDialogWithWaitCursor: wait cursor set, awaiting render flush.");
 
         try
         {
             await dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+            AppCrashLogger.Info("ShowDialogWithWaitCursor: render flush done, scheduling dialog via BeginInvoke.");
 
 #pragma warning disable CS4014
             dispatcher.BeginInvoke(
                 () =>
                 {
+                    AppCrashLogger.Info("ShowDialogWithWaitCursor: BeginInvoke callback running on dispatcher thread.");
                     try
                     {
-                        var result = dialog.ShowDialog() == true;
+                        var owner = Application.Current?.MainWindow;
+                        AppCrashLogger.Info($"ShowDialogWithWaitCursor: owner={owner?.GetType().Name ?? "null"}, calling ShowDialog.");
+                        var result = owner is not null
+                            ? dialog.ShowDialog(owner) == true
+                            : dialog.ShowDialog() == true;
+                        AppCrashLogger.Info($"ShowDialogWithWaitCursor: ShowDialog returned, result={result}.");
                         tcs.SetResult(result);
                     }
                     catch (Exception ex)
                     {
+                        AppCrashLogger.Error("ShowDialogWithWaitCursor: ShowDialog threw.", ex);
                         tcs.SetException(ex);
                     }
                     finally
                     {
                         Mouse.OverrideCursor = null;
+                        AppCrashLogger.Info("ShowDialogWithWaitCursor: cursor reset.");
                     }
                 },
                 DispatcherPriority.Normal);
 #pragma warning restore CS4014
 
-            return await tcs.Task;
+            AppCrashLogger.Info("ShowDialogWithWaitCursor: awaiting tcs.Task.");
+            var dialogResult = await tcs.Task;
+            AppCrashLogger.Info($"ShowDialogWithWaitCursor: tcs.Task resolved, result={dialogResult}.");
+            return dialogResult;
         }
         catch
         {
@@ -806,7 +850,8 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
             {
                 _diagnosticsService.Info("Inspector lifecycle: action node selected.", new Dictionary<string, string> { ["nodeId"] = actionNode.NodeId, ["actionId"] = actionNode.ActionReference.ActionId });
                 var descriptor = _nodeInspectorFactory.CreateDescriptor(actionNode);
-                var inspector = _nodeInspectorFactory.CreateInspector(actionNode, parameters => CommitActionParameters(actionNode.NodeId, parameters));
+                var browserTargets = BuildClickElementBrowserTargets(Document.Nodes);
+                var inspector = _nodeInspectorFactory.CreateInspector(actionNode, browserTargets, parameters => CommitActionParameters(actionNode.NodeId, parameters));
 
                 _diagnosticsService.Info("Inspector lifecycle: inspector resolved.", new Dictionary<string, string> { ["nodeId"] = actionNode.NodeId, ["actionId"] = actionNode.ActionReference.ActionId, ["inspectorTitle"] = inspector.Title });
                 return SelectedNodeInspectorState.CreateActionInspector(actionNode.NodeId, descriptor, inspector);
@@ -823,6 +868,42 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         }
 
         return SelectedNodeInspectorState.CreateNone();
+    }
+
+    private static IReadOnlyList<ClickElementBrowserTargetOption> BuildClickElementBrowserTargets(IReadOnlyList<FlowNodeModel> nodes)
+    {
+        var targets = new List<ClickElementBrowserTargetOption>();
+
+        foreach (var actionNode in nodes.OfType<FlowActionNodeModel>())
+        {
+            switch (actionNode.ActionReference.ActionId)
+            {
+                case "navigate-to-url" when actionNode.ActionParameters is NavigateToUrlActionParameters navigateParameters && !string.IsNullOrWhiteSpace(navigateParameters.Url):
+                    targets.Add(new ClickElementBrowserTargetOption(
+                        actionNode.NodeId,
+                        BuildBrowserTargetDisplayName(actionNode, "Navigate to URL", navigateParameters.Url),
+                        navigateParameters.Url));
+                    break;
+
+                case "new-page" when actionNode.ActionParameters is NewPageActionParameters newPageParameters && !string.IsNullOrWhiteSpace(newPageParameters.InitialUrl):
+                    targets.Add(new ClickElementBrowserTargetOption(
+                        actionNode.NodeId,
+                        BuildBrowserTargetDisplayName(actionNode, "New Page", newPageParameters.InitialUrl),
+                        newPageParameters.InitialUrl));
+                    break;
+            }
+        }
+
+        return targets;
+    }
+
+    private static string BuildBrowserTargetDisplayName(FlowActionNodeModel node, string actionLabel, string url)
+    {
+        var nodeLabel = string.IsNullOrWhiteSpace(node.DisplayLabel)
+            ? actionLabel
+            : node.DisplayLabel.Trim();
+
+        return $"{nodeLabel} - {url}";
     }
 
     private void AttachInspectorValidationListener(INodeInspectorViewModel? inspector)

@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AllItems.Automation.Browser\AllItems.Automation.Browser.csproj" />
     <ProjectReference Include="..\AllItems.Automation.Browser.Core\AllItems.Automation.Browser.Core.csproj" />
+    <ProjectReference Include="..\AllItems.Automation.Browser.Components\AllItems.Automation.Browser.Components.csproj" />
   </ItemGroup>
 
   <ItemGroup>

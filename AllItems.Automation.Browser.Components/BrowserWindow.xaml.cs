@@ -8,6 +8,19 @@ using Microsoft.Web.WebView2.Core;
 
 namespace SelectorDemo.Wpf;
 
+public sealed record BrowserElementSelection(
+    string CssSelector,
+    string XPathSelector,
+    string FrameUrl,
+    string TagName,
+    string ElementId,
+    string ElementName,
+    string ClassName,
+    string HtmlSource,
+    string Attributes,
+    string ComputedStyles,
+    string DomTreeJson);
+
 /// <summary>
 /// Interaction logic for ContentWindow.xaml
 /// </summary>
@@ -44,8 +57,15 @@ public partial class BrowserWindow : Window
 
     private string? _initialUrl;
     private readonly bool _startWithDebug;
+    private readonly bool _returnSelectionOnly;
     private double _selectorPanelWidth = SelectorPanelDefaultWidth;
     private double _debugPanelWidth = DebugPanelDefaultWidth;
+
+    public event Action<string>? CssSelectorSelected;
+    public event Action<BrowserElementSelection>? ElementSelected;
+
+    public string CurrentCssSelector { get; private set; } = string.Empty;
+    public BrowserElementSelection? CurrentSelection { get; private set; }
 
     public BrowserWindow()
     {
@@ -53,14 +73,21 @@ public partial class BrowserWindow : Window
         Loaded += ContentWindow_Loaded;
     }
 
-    public BrowserWindow(string url, bool startWithDebug = false) : this()
+    public BrowserWindow(string url, bool startWithDebug = false, bool returnSelectionOnly = false) : this()
     {
         _initialUrl = url;
         _startWithDebug = startWithDebug;
+        _returnSelectionOnly = returnSelectionOnly;
     }
 
     private async void ContentWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        if (_returnSelectionOnly)
+        {
+            SetSelectorDockOpen(false);
+            SelectorDockTab.Visibility = Visibility.Collapsed;
+        }
+
         await EnsureBrowserReadyAsync();
 
         if (_startWithDebug)
@@ -192,7 +219,19 @@ public partial class BrowserWindow : Window
             if (_inAppSelectionCompletion is not null)
             {
                 _inAppSelectionCompletion.TrySetResult(
-                    new SelectionResult("error", ex.Message, string.Empty, string.Empty, string.Empty));
+                    new SelectionResult(
+                        "error",
+                        ex.Message,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty));
             }
 
             if (_debugCaptureActive)
@@ -352,21 +391,34 @@ public partial class BrowserWindow : Window
 
             if (result.Status == "selected")
             {
-                EnsureSelectionPanelVisible();
-                SelectionPanel.SetSelectors(result.CssSelector, result.XPathSelector);
-                SelectionPanel.SetElementBrowserInfo(result.HtmlSource, result.Attributes, result.ComputedStyles, result.DomTreeJson);
+                CurrentCssSelector = result.CssSelector;
+                CurrentSelection = result.ToBrowserElementSelection();
+                CssSelectorSelected?.Invoke(result.CssSelector);
+                ElementSelected?.Invoke(CurrentSelection);
 
-                var statusMsg = "Element selected.";
-                if (!string.IsNullOrWhiteSpace(result.FrameUrl))
+                if (_returnSelectionOnly)
                 {
-                    statusMsg += $"  (inside frame: {result.FrameUrl})";
+                    StatusTextBox.Text = "Element selected and returned to caller.";
+                    _ = Dispatcher.BeginInvoke(Close);
                 }
-                statusMsg += string.IsNullOrWhiteSpace(result.DomTreeJson)
-                    ? "  [domTree: missing]"
-                    : $"  [domTree: {result.DomTreeJson.Length} chars]";
+                else
+                {
+                    EnsureSelectionPanelVisible();
+                    SelectionPanel.SetSelectors(result.CssSelector, result.XPathSelector);
+                    SelectionPanel.SetElementBrowserInfo(result.HtmlSource, result.Attributes, result.ComputedStyles, result.DomTreeJson);
 
-                StatusTextBox.Text = statusMsg;
-                SelectionPanel.SetStatus(statusMsg);
+                    var statusMsg = "Element selected.";
+                    if (!string.IsNullOrWhiteSpace(result.FrameUrl))
+                    {
+                        statusMsg += $"  (inside frame: {result.FrameUrl})";
+                    }
+                    statusMsg += string.IsNullOrWhiteSpace(result.DomTreeJson)
+                        ? "  [domTree: missing]"
+                        : $"  [domTree: {result.DomTreeJson.Length} chars]";
+
+                    StatusTextBox.Text = statusMsg;
+                    SelectionPanel.SetStatus(statusMsg);
+                }
             }
             else
             {
@@ -1227,6 +1279,10 @@ public partial class BrowserWindow : Window
             cssSelector: cssOf(el),
             xpathSelector: xpathOf(el),
             frameUrl: frameUrl,
+            tagName: el.tagName.toLowerCase(),
+            elementId: el.id || '',
+            elementName: el.getAttribute('name') || '',
+            className: typeof el.className === 'string' ? el.className : '',
             htmlSource: htmlSource,
             attributes: attributes,
             computedStyles: computedStyles,
@@ -1524,6 +1580,10 @@ public partial class BrowserWindow : Window
             cssSelector: cssOf(el),
             xpathSelector: xpathOf(el),
             frameUrl: frameUrl,
+            tagName: el.tagName.toLowerCase(),
+            elementId: el.id || '',
+            elementName: el.getAttribute('name') || '',
+            className: typeof el.className === 'string' ? el.className : '',
             htmlSource: htmlSource,
             attributes: attributes,
             computedStyles: computedStyles,
@@ -1677,6 +1737,10 @@ public partial class BrowserWindow : Window
             GetString("cssSelector"),
             GetString("xpathSelector"),
             GetString("frameUrl"),
+            GetString("tagName"),
+            GetString("elementId"),
+            GetString("elementName"),
+            GetString("className"),
             GetString("htmlSource"),
             GetString("attributes"),
             GetString("computedStyles"),
@@ -1707,10 +1771,31 @@ public partial class BrowserWindow : Window
         string CssSelector,
         string XPathSelector,
         string FrameUrl,
+        string TagName,
+        string ElementId,
+        string ElementName,
+        string ClassName,
         string HtmlSource = "",
         string Attributes = "",
         string ComputedStyles = "",
-        string DomTreeJson = "");
+        string DomTreeJson = "")
+    {
+        public BrowserElementSelection ToBrowserElementSelection()
+        {
+            return new BrowserElementSelection(
+                CssSelector,
+                XPathSelector,
+                FrameUrl,
+                TagName,
+                ElementId,
+                ElementName,
+                ClassName,
+                HtmlSource,
+                Attributes,
+                ComputedStyles,
+                DomTreeJson);
+        }
+    }
 
     private sealed record DebugEventRecord(string Category, string Message, string Detail);
 }

@@ -6,9 +6,9 @@
         xmlns:local="clr-namespace:SelectorDemo.Wpf"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="Browser Content" WindowStartupLocation="CenterScreen" WindowState="Maximized" Icon="SelectorDemo.ico" Background="#F3F3F3">
+        Title="Browser Content" WindowStartupLocation="CenterScreen" WindowState="Maximized" Icon="pack://application:,,,/AllItems.Automation.Browser.Components;component/SelectorDemo.ico" Background="#F3F3F3">
     <Window.Resources>
-        <ResourceDictionary Source="Styles.xaml"/>
+        <ResourceDictionary Source="pack://application:,,,/AllItems.Automation.Browser.Components;component/Styles.xaml"/>
     </Window.Resources>
     
     <DockPanel>

@@ -12,6 +12,7 @@
              PreviewKeyDown="OnPreviewKeyDown">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <views:SelectionContainsNodeIdConverter x:Key="SelectionContainsNodeIdConverter" />
 
         <Style x:Key="CanvasToolbarGlyphStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />

@@ -17,8 +17,32 @@
 
         <Border Style="{StaticResource NodeInspector.CategoryContainerStyle}">
             <StackPanel>
-                <TextBlock Style="{StaticResource NodeInspector.CategoryHeaderTextStyle}" Text="{Binding CategoryName}" />
-                <TextBlock Style="{StaticResource NodeInspector.HelpTextStyle}" Text="{Binding HintText}" />
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Style="{StaticResource NodeInspector.CategoryHeaderTextStyle}" Text="{Binding CategoryName}" />
+                        <TextBlock Style="{StaticResource NodeInspector.HelpTextStyle}" Text="{Binding HintText}" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Width="28"
+                            Height="28"
+                            Margin="8,0,0,0"
+                            Padding="6"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Right"
+                            ToolTip="Open Browser Window"
+                            Click="OpenBrowserWindow_Click"
+                            Style="{StaticResource NodeInspector.SecondaryButtonStyle}">
+                        <Viewbox Width="14" Height="14">
+                            <Path Fill="#1F2937" Data="M 0,0 L 0,12 L 3.5,9 L 6,14 L 8,13 L 5.5,8 L 9,8 Z" />
+                        </Viewbox>
+                    </Button>
+                </Grid>
 
                 <StackPanel Margin="0,0,0,8">
                     <TextBlock Style="{StaticResource NodeInspector.RowLabelTextStyle}" Text="By" />
