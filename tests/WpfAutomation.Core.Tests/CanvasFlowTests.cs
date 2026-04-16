@@ -2,11 +2,11 @@ using FluentAssertions;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
-using WpfAutomation.App.Models;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.App.ViewModels;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace WpfAutomation.Core.Tests;
 

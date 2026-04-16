@@ -1,11 +1,11 @@
 using System.Runtime.Versioning;
 using FluentAssertions;
 using Moq;
-using WpfAutomation.App.Credentials;
-using WpfAutomation.App.Credentials.Models;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.NodeInspector.ViewModels;
-using WpfAutomation.App.Services.Credentials;
+using AllItems.Automation.Browser.App.Credentials;
+using AllItems.Automation.Browser.App.Credentials.Models;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.NodeInspector.ViewModels;
+using AllItems.Automation.Browser.App.Services.Credentials;
 
 namespace WpfAutomation.Core.Tests;
 

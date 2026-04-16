@@ -1,6 +1,6 @@
 using FluentAssertions;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.NodeInspector.ViewModels;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.NodeInspector.ViewModels;
 
 namespace WpfAutomation.Core.Tests;
 

@@ -89,6 +89,6 @@ function Create-IconFile {
 }
 
 # Generate the icon
-$iconPath = Join-Path $PSScriptRoot "..\WpfAutomation.App\Assets\Icons\AppIcon.ico"
+$iconPath = Join-Path $PSScriptRoot "..\AllItems.Automation.Browser.App\Assets\Icons\AppIcon.ico"
 Create-IconFile -OutputPath $iconPath -Sizes @(16, 32, 48, 256)
 Write-Host "Icon file created at: $iconPath"

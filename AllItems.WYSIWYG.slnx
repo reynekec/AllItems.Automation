@@ -2,6 +2,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/WpfAutomation.Core.Tests/WpfAutomation.Core.Tests.csproj" />
   </Folder>
-  <Project Path="WpfAutomation.App/WpfAutomation.App.csproj" />
-  <Project Path="WpfAutomation.Core/WpfAutomation.Core.csproj" />
+  <Project Path="AllItems.Automation.Browser.App/AllItems.Automation.Browser.App.csproj" />
+  <Project Path="AllItems.Automation.Browser.Core/AllItems.Automation.Browser.Core.csproj" />
 </Solution>

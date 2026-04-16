@@ -1,0 +1,130 @@
+<UserControl x:Class="AllItems.Automation.Browser.App.Views.NodeInspectorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:inspector="clr-namespace:AllItems.Automation.Browser.App.NodeInspector.Models"
+             xmlns:vm="clr-namespace:AllItems.Automation.Browser.App.NodeInspector.ViewModels"
+             xmlns:actionViews="clr-namespace:AllItems.Automation.Browser.App.Views.NodeInspectors.Actions"
+             mc:Ignorable="d"
+             d:DesignHeight="500"
+             d:DesignWidth="320">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Views/NodeInspectors/NodeInspectorStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+            <DataTemplate DataType="{x:Type vm:OpenBrowserInspectorViewModel}">
+                <actionViews:OpenBrowserInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:NewPageInspectorViewModel}">
+                <actionViews:NewPageInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:CloseBrowserInspectorViewModel}">
+                <actionViews:CloseBrowserInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:NavigateToUrlInspectorViewModel}">
+                <actionViews:NavigateToUrlInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:GoBackInspectorViewModel}">
+                <actionViews:GoBackInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:GoForwardInspectorViewModel}">
+                <actionViews:GoForwardInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ReloadPageInspectorViewModel}">
+                <actionViews:ReloadPageInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:WaitForUrlInspectorViewModel}">
+                <actionViews:WaitForUrlInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:WaitForUserConfirmationInspectorViewModel}">
+                <actionViews:WaitForUserConfirmationInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ClickElementInspectorViewModel}">
+                <actionViews:ClickElementInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:FillInputInspectorViewModel}">
+                <actionViews:FillInputInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:HoverElementInspectorViewModel}">
+                <actionViews:HoverElementInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:PressKeyInspectorViewModel}">
+                <actionViews:PressKeyInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SelectOptionInspectorViewModel}">
+                <actionViews:SelectOptionInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ExpectEnabledInspectorViewModel}">
+                <actionViews:ExpectEnabledInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ExpectHiddenInspectorViewModel}">
+                <actionViews:ExpectHiddenInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ExpectTextInspectorViewModel}">
+                <actionViews:ExpectTextInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ExpectVisibleInspectorViewModel}">
+                <actionViews:ExpectVisibleInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ForContainerInspectorViewModel}">
+                <actionViews:ForContainerInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ForEachContainerInspectorViewModel}">
+                <actionViews:ForEachContainerInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:WhileContainerInspectorViewModel}">
+                <actionViews:WhileContainerInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:UnknownContainerInspectorViewModel}">
+                <actionViews:UnknownActionInspectorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:UnknownActionInspectorViewModel}">
+                <actionViews:UnknownActionInspectorView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Border Padding="12">
+        <StackPanel>
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedNodeInspector.HasInspector}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <TextBlock FontSize="16"
+                           FontWeight="SemiBold"
+                           Text="{Binding SelectedNodeInspector.Title}" />
+
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="#555"
+                           TextWrapping="Wrap"
+                           Text="{Binding SelectedNodeInspector.Message}" />
+            </StackPanel>
+
+            <ContentControl Content="{Binding SelectedNodeInspector.InspectorViewModel}"
+                            Visibility="{Binding SelectedNodeInspector.HasInspector, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Setter Property="Margin" Value="0,16,0,0" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedNodeInspector.HasInspector}" Value="True">
+                                <Setter Property="Margin" Value="0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
+        </StackPanel>
+    </Border>
+</UserControl>

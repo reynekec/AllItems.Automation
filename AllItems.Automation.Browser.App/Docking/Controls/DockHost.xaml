@@ -1,0 +1,577 @@
+<UserControl x:Class="AllItems.Automation.Browser.App.Docking.Controls.DockHost"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:models="clr-namespace:AllItems.Automation.Browser.App.Docking.Models"
+             xmlns:controls="clr-namespace:AllItems.Automation.Browser.App.Docking.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="640"
+             d:DesignWidth="1000"
+             FontFamily="Segoe UI"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             KeyboardNavigation.TabNavigation="Continue"
+             FocusVisualStyle="{x:Null}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/AllItems.Automation.Browser.App;component/Docking/DockingStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+            <controls:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+
+        <Style x:Key="DockHostPinButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource DockHostHeaderButtonStyle}">
+            <Setter Property="ToolTip" Value="Pin panel" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Host"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <Viewbox Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Grid x:Name="PinGlyphGrid" Width="32" Height="32">
+                                    <Grid.RenderTransform>
+                                        <RotateTransform Angle="-34" CenterX="16" CenterY="16" />
+                                    </Grid.RenderTransform>
+                                    <Rectangle Width="18"
+                                               Height="4"
+                                               Margin="7,2,7,0"
+                                               VerticalAlignment="Top"
+                                               Fill="#FF2B2F33" />
+                                    <Rectangle Width="6"
+                                               Height="6"
+                                               Margin="0,6,0,0"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Top"
+                                               Fill="#FF2B2F33" />
+                                    <Path Fill="#FF2B2F33"
+                                          Data="M10,12 C7.6,13.4 6,16.5 6,20 H26 C26,16.5 24.4,13.4 22,12 Z" />
+                                    <Rectangle Width="2.6"
+                                               Height="11"
+                                               Margin="0,20,0,0"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Top"
+                                               Fill="#FF2B2F33" />
+                                </Grid>
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Host" Property="Background" Value="#FFE9F2FB" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Host" Property="Background" Value="#FFDCEBFB" />
+                                <Setter TargetName="PinGlyphGrid" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="-30" CenterX="12" CenterY="12" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+                                <Setter TargetName="PinGlyphGrid" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="0" CenterX="12" CenterY="12" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="ToolTip" Value="Unpin panel" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <LinearGradientBrush x:Key="AutoHideTabBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFF5F7FA" Offset="0" />
+            <GradientStop Color="#FFE9EEF5" Offset="1" />
+        </LinearGradientBrush>
+
+        <DataTemplate DataType="{x:Type models:DockPanelState}">
+            <Border Margin="8"
+                    Padding="10"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    BorderBrush="{StaticResource DockHost.PanelBodyBorderBrush}"
+                    Background="{StaticResource DockHost.PanelBodyBackgroundBrush}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{StaticResource DockHost.TextBrush}" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding ContentKey, StringFormat=Panel content key: {0}}" Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TabHeaderTemplate" DataType="{x:Type models:DockPanelState}">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="{Binding Title}" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{StaticResource DockHost.TextBrush}" FontSize="11" />
+                <Button
+                    Width="28"
+                        Height="20"
+                        Margin="0,0,2,0"
+                        Padding="0"
+                        Tag="{Binding IsPinned}"
+                        Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=TogglePinCommand}"
+                        CommandParameter="{Binding}"
+                        Style="{StaticResource DockHostPinButtonStyle}"
+                        Visibility="{Binding IsPinnable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Content="≡"
+                    Width="28"
+                        Height="20"
+                        Margin="0,0,2,0"
+                        Padding="0"
+                        FontSize="12"
+                        ToolTip="Float window"
+                        Style="{StaticResource DockHostHeaderButtonStyle}"
+                        Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=FloatCommand}"
+                        CommandParameter="{Binding}"
+                        Visibility="{Binding IsToolWindow, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Content="✕"
+                    Width="28"
+                        Height="20"
+                        Padding="0"
+                        FontSize="12"
+                        ToolTip="Close"
+                        Style="{StaticResource DockHostHeaderButtonStyle}"
+                        Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=CloseCommand}"
+                        CommandParameter="{Binding}"
+                        Visibility="{Binding IsClosable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </DockPanel>
+        </DataTemplate>
+
+        <Style x:Key="DockZoneTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource DockHost.PanelBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DockHost.PanelBorderBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource DockHost.TextBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="AllowDrop" Value="True" />
+            <Setter Property="KeyboardNavigation.TabNavigation" Value="Continue" />
+            <Setter Property="TabStripPlacement" Value="Top" />
+        </Style>
+
+        <Style x:Key="DockTabItemContainerStyle"
+               TargetType="TabItem"
+               BasedOn="{StaticResource DockHostTabItemStyle}">
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="TabItem_OnPreviewMouseLeftButtonDown" />
+            <EventSetter Event="PreviewMouseMove" Handler="TabItem_OnPreviewMouseMove" />
+        </Style>
+
+        <Style x:Key="DockZoneEmptyStateStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource DockHost.PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="{StaticResource DockHost.SurfaceBackgroundBrush}" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+
+        <Style x:Key="DockGridSplitterStyle"
+               TargetType="GridSplitter"
+               BasedOn="{StaticResource DockHostSplitterStyle}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ShowsPreview" Value="True" />
+            <Setter Property="ResizeBehavior" Value="PreviousAndNext" />
+        </Style>
+
+        <Style x:Key="DockDropTargetBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#CC1F1F20" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{StaticResource DockHost.AccentBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Width" Value="72" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4" />
+        </Style>
+
+        <Style x:Key="AutoHideSideTabButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="108" />
+            <Setter Property="Margin" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource DockHost.TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource AutoHideTabBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DockHost.PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="TabRoot"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="AccentBar"
+                                    Width="3"
+                                    HorizontalAlignment="Left"
+                                    Background="{StaticResource DockHost.AccentBrush}"
+                                    Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="#FFE8EFF8" />
+                                <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="#FF0E84B5" />
+                                <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AutoHideHorizontalTabButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Margin" Value="0,0,1,0" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource DockHost.TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource AutoHideTabBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DockHost.PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="TabRoot"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="AccentBar"
+                                    Height="3"
+                                    VerticalAlignment="Top"
+                                    Background="{StaticResource DockHost.AccentBrush}"
+                                    Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="#FFE8EFF8" />
+                                <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="#FF0E84B5" />
+                                <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid x:Name="RootGrid"
+          Background="{StaticResource DockHost.SurfaceBackgroundBrush}"
+          AllowDrop="True"
+            SizeChanged="RootGrid_OnSizeChanged"
+            PreviewKeyDown="RootGrid_OnPreviewKeyDown"
+          DragEnter="RootGrid_OnDragEnter"
+          DragOver="RootGrid_OnDragOver"
+          DragLeave="RootGrid_OnDragLeave"
+          Drop="RootGrid_OnDrop">
+        <Grid.RowDefinitions>
+            <RowDefinition x:Name="TopZoneRow" Height="170" />
+            <RowDefinition x:Name="TopSplitterRow" Height="6" />
+            <RowDefinition x:Name="CenterZoneRow" Height="*" MinHeight="120" />
+            <RowDefinition x:Name="BottomSplitterRow" Height="6" />
+            <RowDefinition x:Name="BottomZoneRow" Height="170" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="LeftZoneColumn" Width="260" />
+            <ColumnDefinition x:Name="LeftSplitterColumn" Width="6" />
+            <ColumnDefinition x:Name="CenterZoneColumn" Width="*" MinWidth="240" />
+            <ColumnDefinition x:Name="RightSplitterColumn" Width="6" />
+            <ColumnDefinition x:Name="RightZoneColumn" Width="260" />
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Row="0" Grid.Column="2">
+            <TabControl x:Name="TopTabControl"
+                        Style="{StaticResource DockZoneTabControlStyle}"
+                        SelectedIndex="0"
+                        SelectedItem="{Binding SelectedTopPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                        ItemsSource="{Binding TopPanels, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ItemTemplate="{StaticResource TabHeaderTemplate}"
+                        ItemContainerStyle="{StaticResource DockTabItemContainerStyle}"
+                        Drop="TopTabControl_OnDrop"
+                        ContentTemplateSelector="{Binding PanelContentTemplateSelector, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <Border Style="{StaticResource DockZoneEmptyStateStyle}"
+                    Visibility="{Binding HasTopPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <TextBlock Text="Top zone is empty"
+                           FontSize="12"
+                           Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="1"
+                      Grid.Column="2"
+                      Height="6"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Rows"
+                      Style="{StaticResource DockGridSplitterStyle}" />
+
+        <Grid Grid.Row="2" Grid.RowSpan="3" Grid.Column="0">
+            <TabControl x:Name="LeftTabControl"
+                        Style="{StaticResource DockZoneTabControlStyle}"
+                        SelectedIndex="0"
+                        SelectedItem="{Binding SelectedLeftPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                        ItemsSource="{Binding LeftPanels, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ItemContainerStyle="{StaticResource DockTabItemContainerStyle}"
+                        Drop="LeftTabControl_OnDrop"
+                        ItemTemplate="{StaticResource TabHeaderTemplate}"
+                        ContentTemplateSelector="{Binding PanelContentTemplateSelector, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <Border Style="{StaticResource DockZoneEmptyStateStyle}"
+                    Visibility="{Binding HasLeftPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <TextBlock Text="Left zone is empty"
+                           FontSize="12"
+                           Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="2"
+                      Grid.RowSpan="3"
+                      Grid.Column="1"
+                      Width="6"
+                      VerticalAlignment="Stretch"
+                      ResizeDirection="Columns"
+                      Style="{StaticResource DockGridSplitterStyle}" />
+
+        <Grid Grid.Row="2" Grid.Column="2">
+            <TabControl x:Name="CenterTabControl"
+                        Style="{StaticResource DockZoneTabControlStyle}"
+                        SelectedIndex="0"
+                        SelectedItem="{Binding SelectedCenterPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                        ItemsSource="{Binding CenterPanels, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ItemContainerStyle="{StaticResource DockTabItemContainerStyle}"
+                        Drop="CenterTabControl_OnDrop"
+                        ItemTemplate="{StaticResource TabHeaderTemplate}"
+                        ContentTemplateSelector="{Binding PanelContentTemplateSelector, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <Border Style="{StaticResource DockZoneEmptyStateStyle}"
+                    Visibility="{Binding HasCenterPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <TextBlock Text="Drop panels here"
+                           FontSize="12"
+                           Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="2"
+                      Grid.RowSpan="3"
+                      Grid.Column="3"
+                      Width="6"
+                      VerticalAlignment="Stretch"
+                      ResizeDirection="Columns"
+                      Style="{StaticResource DockGridSplitterStyle}" />
+
+        <Grid Grid.Row="2" Grid.RowSpan="3" Grid.Column="4">
+            <TabControl x:Name="RightTabControl"
+                        Style="{StaticResource DockZoneTabControlStyle}"
+                        SelectedIndex="0"
+                        SelectedItem="{Binding SelectedRightPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                        ItemsSource="{Binding RightPanels, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ItemContainerStyle="{StaticResource DockTabItemContainerStyle}"
+                        Drop="RightTabControl_OnDrop"
+                        ItemTemplate="{StaticResource TabHeaderTemplate}"
+                        ContentTemplateSelector="{Binding PanelContentTemplateSelector, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <Border Visibility="{Binding HasRightPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource DockZoneEmptyStateStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasAutoHideRightPanels, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="Right zone is empty"
+                           FontSize="12"
+                           Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="3"
+                      Grid.Column="2"
+                      Height="6"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Rows"
+                      Style="{StaticResource DockGridSplitterStyle}" />
+
+        <Grid Grid.Row="4" Grid.Column="2">
+            <TabControl x:Name="BottomTabControl"
+                        Style="{StaticResource DockZoneTabControlStyle}"
+                        SelectedIndex="0"
+                        SelectedItem="{Binding SelectedBottomPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                        ItemsSource="{Binding BottomPanels, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        ItemContainerStyle="{StaticResource DockTabItemContainerStyle}"
+                        Drop="BottomTabControl_OnDrop"
+                        ItemTemplate="{StaticResource TabHeaderTemplate}"
+                        ContentTemplateSelector="{Binding PanelContentTemplateSelector, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <Border Style="{StaticResource DockZoneEmptyStateStyle}"
+                    Visibility="{Binding HasBottomPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <TextBlock Text="Bottom zone is empty"
+                           FontSize="12"
+                           Foreground="{StaticResource DockHost.EmptyStateForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
+        <Grid x:Name="DropOverlay"
+              Visibility="Collapsed"
+              Background="#40DDE4EF"
+              IsHitTestVisible="True">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="DropTargetTop" Tag="Top" Style="{StaticResource DockDropTargetBorderStyle}">
+                    <TextBlock Text="Top" Foreground="{StaticResource DockHost.TextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Border x:Name="DropTargetLeft" Tag="Left" Style="{StaticResource DockDropTargetBorderStyle}">
+                        <TextBlock Text="Left" Foreground="{StaticResource DockHost.TextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="DropTargetCenter" Tag="Center" Style="{StaticResource DockDropTargetBorderStyle}">
+                        <TextBlock Text="Center" Foreground="{StaticResource DockHost.TextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="DropTargetRight" Tag="Right" Style="{StaticResource DockDropTargetBorderStyle}">
+                        <TextBlock Text="Right" Foreground="{StaticResource DockHost.TextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </StackPanel>
+                <Border x:Name="DropTargetBottom" Tag="Bottom" Style="{StaticResource DockDropTargetBorderStyle}">
+                    <TextBlock Text="Bottom" Foreground="{StaticResource DockHost.TextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <ItemsControl HorizontalAlignment="Left"
+                      Grid.Row="0"
+                      Grid.RowSpan="5"
+                      Grid.Column="0"
+                      VerticalAlignment="Top"
+                      Margin="0"
+                      Panel.ZIndex="20"
+                      Visibility="{Binding HasAutoHideLeftPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding LeftAutoHideTabs, RelativeSource={RelativeSource AncestorType=UserControl}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type models:DockPanelState}">
+                    <Button Style="{StaticResource AutoHideSideTabButtonStyle}"
+                            ToolTip="Restore panel"
+                            Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=RestoreAutoHidePanelCommand}"
+                            CommandParameter="{Binding}">
+                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource DockHost.TextBrush}">
+                            <TextBlock.LayoutTransform>
+                                <RotateTransform Angle="-90" />
+                            </TextBlock.LayoutTransform>
+                        </TextBlock>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl HorizontalAlignment="Right"
+                      Grid.Row="0"
+                      Grid.RowSpan="5"
+                      Grid.Column="4"
+                      VerticalAlignment="Top"
+                      Margin="0"
+                      Panel.ZIndex="20"
+                      Visibility="{Binding HasAutoHideRightPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding RightAutoHideTabs, RelativeSource={RelativeSource AncestorType=UserControl}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type models:DockPanelState}">
+                    <Button Style="{StaticResource AutoHideSideTabButtonStyle}"
+                            ToolTip="Restore panel"
+                            Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=RestoreAutoHidePanelCommand}"
+                            CommandParameter="{Binding}">
+                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource DockHost.TextBrush}">
+                            <TextBlock.LayoutTransform>
+                                <RotateTransform Angle="90" />
+                            </TextBlock.LayoutTransform>
+                        </TextBlock>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl HorizontalAlignment="Left"
+                      Grid.Row="0"
+                      Grid.RowSpan="5"
+                      Grid.Column="0"
+                      Grid.ColumnSpan="5"
+                      VerticalAlignment="Top"
+                      Margin="24,0,0,0"
+                      Panel.ZIndex="20"
+                      Visibility="{Binding HasAutoHideTopPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding TopAutoHideTabs, RelativeSource={RelativeSource AncestorType=UserControl}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type models:DockPanelState}">
+                    <Button Content="{Binding Title}"
+                            Style="{StaticResource AutoHideHorizontalTabButtonStyle}"
+                            ToolTip="Restore panel"
+                            Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=RestoreAutoHidePanelCommand}"
+                            CommandParameter="{Binding}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl HorizontalAlignment="Left"
+                      Grid.Row="0"
+                      Grid.RowSpan="5"
+                      Grid.Column="0"
+                      Grid.ColumnSpan="5"
+                      VerticalAlignment="Bottom"
+                      Margin="24,0,0,0"
+                      Panel.ZIndex="20"
+                      Visibility="{Binding HasAutoHideBottomPanels, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding BottomAutoHideTabs, RelativeSource={RelativeSource AncestorType=UserControl}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type models:DockPanelState}">
+                    <Button Content="{Binding Title}"
+                            Style="{StaticResource AutoHideHorizontalTabButtonStyle}"
+                            ToolTip="Restore panel"
+                            Command="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=RestoreAutoHidePanelCommand}"
+                            CommandParameter="{Binding}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

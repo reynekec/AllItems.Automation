@@ -1,0 +1,254 @@
+<UserControl x:Class="AllItems.Automation.Browser.App.Views.FlowContainerNodeControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:AllItems.Automation.Browser.App.Views"
+             mc:Ignorable="d"
+             ClipToBounds="False">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <views:SelectionContainsNodeIdConverter x:Key="SelectionContainsNodeIdConverter" />
+        <views:LaneHoverMatchConverter x:Key="LaneHoverMatchConverter" />
+
+        <SolidColorBrush x:Key="Flow.ActionBorder" Color="#FFD5DDE8" />
+        <SolidColorBrush x:Key="Flow.ContainerFill" Color="#FFF7FAFD" />
+        <SolidColorBrush x:Key="Flow.LaneFill" Color="#FFF3F6FA" />
+        <SolidColorBrush x:Key="Flow.ContainerText" Color="#FF354D66" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleBorder" Color="#FFD2DCE7" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleHoverBorder" Color="#FFB9C9D9" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleHoverFill" Color="#EEF4FA" />
+        <SolidColorBrush x:Key="Flow.ContainerTogglePressedFill" Color="#DFEAF4" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleIcon" Color="#FF50697F" />
+        <SolidColorBrush x:Key="Flow.ContainerToggleIconHover" Color="#FF2E4A63" />
+
+        <Style x:Key="FlowSelectionAwareBorderStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource Flow.ActionBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource SelectionContainsNodeIdConverter}">
+                            <Binding Path="NodeId" />
+                            <Binding Path="SelectedNodeIds" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="BorderBrush" Value="#FF2F6FDC" />
+                    <Setter Property="BorderThickness" Value="2" />
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="#332F6FDC" Opacity="1" />
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FlowContainerToggleButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource Flow.ContainerToggleBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Path x:Name="CollapsedChevron"
+                                      Width="10"
+                                      Height="10"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{StaticResource Flow.ContainerToggleIcon}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M 3,2 L 7.5,6 L 3,10" />
+                                <Path x:Name="ExpandedChevron"
+                                      Width="10"
+                                      Height="10"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Stretch="Uniform"
+                                      Stroke="{StaticResource Flow.ContainerToggleIcon}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Data="M 2,3 L 6,7.5 L 10,3"
+                                      Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                <Setter TargetName="CollapsedChevron" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="ExpandedChevron" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{StaticResource Flow.ContainerToggleHoverFill}" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource Flow.ContainerToggleHoverBorder}" />
+                                <Setter TargetName="CollapsedChevron" Property="Stroke" Value="{StaticResource Flow.ContainerToggleIconHover}" />
+                                <Setter TargetName="ExpandedChevron" Property="Stroke" Value="{StaticResource Flow.ContainerToggleIconHover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{StaticResource Flow.ContainerTogglePressedFill}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Background="{StaticResource Flow.ContainerFill}" Style="{StaticResource FlowSelectionAwareBorderStyle}">
+        <Grid Margin="8,8,8,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding DisplayLabel}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource Flow.ContainerText}"
+                           TextTrimming="CharacterEllipsis" />
+
+                <Button Grid.Column="1"
+                        Margin="8,0,0,0"
+                        ClickMode="Press"
+                        Style="{StaticResource FlowContainerToggleButtonStyle}"
+                        Command="{Binding ToggleCollapseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding NodeId}" />
+            </Grid>
+
+            <ItemsControl Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding ChildLanes}"
+                          Visibility="{Binding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,5,0,0"
+                                Padding="8"
+                                MinHeight="{Binding VisualHeight}"
+                                BorderThickness="1"
+                                BorderBrush="#FFC7D4E3"
+                                Background="{StaticResource Flow.LaneFill}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="#FFC7D4E3" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Setter Property="Background" Value="{StaticResource Flow.LaneFill}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Value="True">
+                                            <DataTrigger.Binding>
+                                                <MultiBinding Converter="{StaticResource LaneHoverMatchConverter}">
+                                                    <Binding Path="LaneId" />
+                                                    <Binding Path="HoveredLaneId" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                </MultiBinding>
+                                            </DataTrigger.Binding>
+                                            <Setter Property="BorderBrush" Value="#FF198E4A" />
+                                            <Setter Property="BorderThickness" Value="2" />
+                                            <Setter Property="Background" Value="#E8F7EE" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="{Binding DisplayLabel}" FontSize="11" FontWeight="SemiBold" Foreground="#FF5A6E81" />
+                                <TextBlock Text="{Binding NodeIds.Count, StringFormat={}{0} item(s)}" Margin="8,0,0,0" FontSize="11" Foreground="#FF74879A" />
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Width="16"
+                    Height="16"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="-22,6,0,0"
+                    CornerRadius="8"
+                    Background="#FF177E43"
+                    BorderBrush="#FFFFFFFF"
+                    BorderThickness="1.2"
+                    Visibility="Collapsed">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource SelectionContainsNodeIdConverter}">
+                                        <Binding Path="NodeId" />
+                                        <Binding Path="SuccessfulNodeIds" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock FontSize="11"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="White"
+                           Text="✔" />
+            </Border>
+
+            <Border Width="16"
+                    Height="16"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="-22,6,0,0"
+                    CornerRadius="8"
+                    Background="#FFC62828"
+                    BorderBrush="#FFFFFFFF"
+                    BorderThickness="1.2"
+                    Visibility="Collapsed">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                    <MultiBinding Converter="{StaticResource SelectionContainsNodeIdConverter}">
+                                        <Binding Path="NodeId" />
+                                        <Binding Path="FailedNodeIds" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                    </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock FontSize="11"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="White"
+                           Text="✖" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

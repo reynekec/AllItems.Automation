@@ -2,9 +2,9 @@ using FluentAssertions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.Core.Diagnostics;
 using Xunit;
 
 namespace WpfAutomation.Core.Tests;

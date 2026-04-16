@@ -1,0 +1,108 @@
+<UserControl x:Class="AllItems.Automation.Browser.App.Views.NodeInspectors.Actions.NavigateToUrlInspectorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:shared="clr-namespace:AllItems.Automation.Browser.App.Views.NodeInspectors"
+             mc:Ignorable="d"
+             d:DesignHeight="360"
+             d:DesignWidth="320">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+
+    <StackPanel>
+        <TextBlock Text="Navigate to URL"
+                   Style="{StaticResource NodeInspector.EmphasisValueTextStyle}"
+                   Margin="0,0,0,8" />
+        <shared:ActionInspectorEditorView />
+
+        <Border Style="{StaticResource NodeInspector.CategoryContainerStyle}"
+                Margin="0,8,0,0"
+                Visibility="{Binding IsAuthenticationSectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource NodeInspector.CategoryHeaderTextStyle}" Text="Authentication" />
+                <TextBlock Style="{StaticResource NodeInspector.HelpTextStyle}" Text="Select a credential to use when logging in to this page." />
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ComboBox x:Name="CredentialPickerComboBox"
+                              Grid.Column="0"
+                              ItemsSource="{Binding FilteredCredentialOptions}"
+                              SelectedItem="{Binding SelectedCredentialOption, Mode=TwoWay}"
+                              Text="{Binding CredentialSearchText, Mode=OneWayToSource, UpdateSourceTrigger=PropertyChanged}"
+                              DisplayMemberPath="DisplayText"
+                              IsEditable="True"
+                              IsTextSearchEnabled="False"
+                              StaysOpenOnEdit="True"
+                              GotKeyboardFocus="CredentialPickerComboBoxGotKeyboardFocus"
+                              Style="{StaticResource NodeInspector.ComboBoxStyle}"
+                              IsEnabled="{Binding IsCredentialPickerEnabled}"
+                              ToolTip="Type to filter credentials" />
+
+                    <Button Grid.Column="2"
+                            MinWidth="52"
+                            Content="+ Add"
+                            Command="{Binding OpenCredentialManagerCommand}"
+                            Style="{StaticResource NodeInspector.SecondaryButtonStyle}" />
+
+                    <Button Grid.Column="4"
+                            MinWidth="78"
+                            Content="Clear"
+                            Command="{Binding ClearCredentialCommand}"
+                            Style="{StaticResource NodeInspector.SecondaryButtonStyle}" />
+                </Grid>
+
+                <TextBlock Margin="0,6,0,0"
+                           Text="{Binding CredentialPickerStateMessage}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource NodeInspector.HelpTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasCredentialPickerStateMessage}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <TextBlock Margin="0,6,0,0"
+                           Text="No matching credentials. Use + Add to create one.">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource NodeInspector.HelpTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasNoCredentialMatches}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <TextBlock Margin="0,8,0,0"
+                           Text="{Binding CredentialWarningMessage}"
+                           Foreground="#FFB42318">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource NodeInspector.HelpTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasCredentialWarning}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

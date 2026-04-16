@@ -1,8 +1,8 @@
 using System.Reflection;
 using AllItems.Automation.Browser.Actions.Browser;
 using FluentAssertions;
-using WpfAutomation.App.Services;
-using WpfAutomation.Core.Abstractions.Actions;
+using AllItems.Automation.Browser.App.Services;
+using AllItems.Automation.Browser.Core.Abstractions.Actions;
 
 namespace WpfAutomation.Core.Tests;
 

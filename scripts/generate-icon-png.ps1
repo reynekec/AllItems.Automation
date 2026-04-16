@@ -21,7 +21,7 @@ $g.DrawString('AP', $font, $textBrush, ($size/2), ($size/2), $stringFormat)
 $g.Dispose()
 
 # Save as PNG
-$outputPath = '.\WpfAutomation.App\Assets\Icons\AppIcon.png'
+$outputPath = '.\AllItems.Automation.Browser.App\Assets\Icons\AppIcon.png'
 $bmp.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp.Dispose()
 

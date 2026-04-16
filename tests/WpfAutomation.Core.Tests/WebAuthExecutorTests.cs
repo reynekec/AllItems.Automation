@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Moq;
-using WpfAutomation.App.Credentials.Models;
-using WpfAutomation.App.Services;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.Core.Abstractions;
-using WpfAutomation.Core.Browser;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.App.Credentials.Models;
+using AllItems.Automation.Browser.App.Services;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.Core.Abstractions;
+using AllItems.Automation.Browser.Core.Browser;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace WpfAutomation.Core.Tests;
 

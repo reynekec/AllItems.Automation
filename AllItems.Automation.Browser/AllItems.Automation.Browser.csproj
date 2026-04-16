@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\WpfAutomation.Core\WpfAutomation.Core.csproj" />
+    <ProjectReference Include="..\AllItems.Automation.Browser.Core\AllItems.Automation.Browser.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

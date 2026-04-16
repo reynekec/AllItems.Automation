@@ -1,4 +1,4 @@
-using WpfAutomation.Core.Abstractions.Actions;
+using AllItems.Automation.Browser.Core.Abstractions.Actions;
 
 namespace AllItems.Automation.Browser.Actions.ControlFlow;
 

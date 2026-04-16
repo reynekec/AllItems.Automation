@@ -1,13 +1,13 @@
 using FluentAssertions;
 using Microsoft.Playwright;
 using Moq;
-using WpfAutomation.Core.Browser;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
-using WpfAutomation.Core.Elements;
-using WpfAutomation.Core.Exceptions;
-using WpfAutomation.Core.Page;
-using AppBrowserType = WpfAutomation.Core.Configuration.BrowserType;
+using AllItems.Automation.Browser.Core.Browser;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
+using AllItems.Automation.Browser.Core.Elements;
+using AllItems.Automation.Browser.Core.Exceptions;
+using AllItems.Automation.Browser.Core.Page;
+using AppBrowserType = AllItems.Automation.Browser.Core.Configuration.BrowserType;
 
 namespace WpfAutomation.Core.Tests;
 

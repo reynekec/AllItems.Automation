@@ -158,7 +158,7 @@ public sealed class Phase7InspectionJavaScriptTests
     private static string LoadScript(string fileName)
     {
         var root = ResolveRepositoryRoot();
-        var scriptPath = Path.Combine(root, "WpfAutomation.Core", "Inspection", "JavaScript", fileName);
+        var scriptPath = Path.Combine(root, "AllItems.Automation.Browser.Core", "Inspection", "JavaScript", fileName);
         return File.ReadAllText(scriptPath);
     }
 

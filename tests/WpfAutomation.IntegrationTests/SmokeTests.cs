@@ -1,10 +1,10 @@
 using FluentAssertions;
-using WpfAutomation.App.Models;
-using WpfAutomation.App.Services;
-using WpfAutomation.App.ViewModels;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
-using WpfAutomation.Core.Exceptions;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.App.Services;
+using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
+using AllItems.Automation.Browser.Core.Exceptions;
 using WpfAutomation.IntegrationTests.TestUtilities;
 
 namespace WpfAutomation.IntegrationTests;
@@ -28,7 +28,7 @@ public sealed class SmokeTests
     [Fact]
     public async Task Basic_Automation_Flow_Works()
     {
-        var (session, _) = await IntegrationHarness.TryStartSessionAsync(WpfAutomation.Core.Configuration.BrowserType.Chromium);
+        var (session, _) = await IntegrationHarness.TryStartSessionAsync(AllItems.Automation.Browser.Core.Configuration.BrowserType.Chromium);
         if (session is null)
         {
             return;
@@ -47,8 +47,8 @@ public sealed class SmokeTests
     public async Task Launch_Cancellation_Is_Handled()
     {
         var diagnostics = new DiagnosticsService();
-        var launcher = new WpfAutomation.Core.Browser.BrowserLauncher(
-            WpfAutomation.Core.Configuration.BrowserType.Chromium,
+        var launcher = new AllItems.Automation.Browser.Core.Browser.BrowserLauncher(
+            AllItems.Automation.Browser.Core.Configuration.BrowserType.Chromium,
             diagnosticsService: diagnostics);
 
         using var cts = new CancellationTokenSource();
@@ -69,7 +69,7 @@ public sealed class SmokeTests
 
     private sealed class FakeOrchestrator : IAutomationOrchestrator
     {
-        public Task<WpfAutomation.Core.Abstractions.IPageWrapper> RunNavigationAsync(string url, CancellationToken cancellationToken)
+        public Task<AllItems.Automation.Browser.Core.Abstractions.IPageWrapper> RunNavigationAsync(string url, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Fake orchestrator does not provide page navigation in this smoke test.");
         }

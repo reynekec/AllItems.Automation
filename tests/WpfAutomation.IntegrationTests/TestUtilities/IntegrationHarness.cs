@@ -1,10 +1,10 @@
-using WpfAutomation.Core.Browser;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.Core.Browser;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace WpfAutomation.IntegrationTests.TestUtilities;
 
-using AppBrowserType = WpfAutomation.Core.Configuration.BrowserType;
+using AppBrowserType = AllItems.Automation.Browser.Core.Configuration.BrowserType;
 
 internal static class IntegrationHarness
 {

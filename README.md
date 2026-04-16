@@ -14,15 +14,15 @@ dotnet test WpfAutomation.sln --no-build
 ```
 3. Launch the WPF host app:
 ```powershell
-dotnet run --project WpfAutomation.App/WpfAutomation.App.csproj
+dotnet run --project AllItems.Automation.Browser.App/AllItems.Automation.Browser.App.csproj
 ```
 
 ## Fluent API Examples
 
 Navigate and interact:
 ```csharp
-using WpfAutomation.Core;
-using WpfAutomation.Core.Configuration;
+using AllItems.Automation.Browser.Core;
+using AllItems.Automation.Browser.Core.Configuration;
 
 var page = await Automation
 	.OpenBrowser(BrowserType.Chromium)
@@ -34,8 +34,8 @@ await button.ClickAsync();
 
 Session-based usage:
 ```csharp
-using WpfAutomation.Core.Browser;
-using WpfAutomation.Core.Configuration;
+using AllItems.Automation.Browser.Core.Browser;
+using AllItems.Automation.Browser.Core.Configuration;
 
 var launcher = new BrowserLauncher(BrowserType.Chromium);
 await using var session = await launcher.StartAsync(new BrowserOptions { Headless = true });
@@ -78,9 +78,9 @@ The host app provides:
 - Run status updates for running/completed/cancelled/failed states.
 
 Main surfaces:
-- App bootstrap and DI: `WpfAutomation.App/App.xaml.cs`
-- View model orchestration: `WpfAutomation.App/ViewModels/MainViewModel.cs`
-- UI layout: `WpfAutomation.App/MainWindow.xaml`
+- App bootstrap and DI: `AllItems.Automation.Browser.App/App.xaml.cs`
+- View model orchestration: `AllItems.Automation.Browser.App/ViewModels/MainViewModel.cs`
+- UI layout: `AllItems.Automation.Browser.App/MainWindow.xaml`
 
 ## Actions Sidebar Contract (WPF)
 
@@ -104,7 +104,7 @@ Action authoring metadata requirement:
 - Missing/null `IsContainer` is treated as `false` for backward compatibility.
 
 Main window integration:
-- The control is hosted in `WpfAutomation.App/MainWindow.xaml` as `ActionsSidebarControl`.
+- The control is hosted in `AllItems.Automation.Browser.App/MainWindow.xaml` as `ActionsSidebarControl`.
 - `MainViewModel` seeds a starter catalog and owns mutable sidebar state and callbacks.
 
 Known parity gaps (v1 vs full Power Automate UI):

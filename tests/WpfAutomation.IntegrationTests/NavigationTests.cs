@@ -1,11 +1,11 @@
 using FluentAssertions;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Exceptions;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Exceptions;
 using WpfAutomation.IntegrationTests.TestUtilities;
 
 namespace WpfAutomation.IntegrationTests;
 
-using AppBrowserType = WpfAutomation.Core.Configuration.BrowserType;
+using AppBrowserType = AllItems.Automation.Browser.Core.Configuration.BrowserType;
 
 public sealed class NavigationTests
 {

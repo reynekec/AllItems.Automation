@@ -791,7 +791,7 @@ Use Task-based background execution for automation flows.
 ```text
 src/
 ├─ WpfAutomation.sln
-├─ WpfAutomation.App/
+├─ AllItems.Automation.Browser.App/
 │  ├─ App.xaml
 │  ├─ App.xaml.cs
 │  ├─ Views/
@@ -812,7 +812,7 @@ src/
 │  │  └─ UiLogItem.cs
 │  └─ Resources/
 │
-├─ WpfAutomation.Core/
+├─ AllItems.Automation.Browser.Core/
 │  ├─ Automation.cs
 │  ├─ Abstractions/
 │  │  ├─ IBrowserLauncher.cs
@@ -883,8 +883,8 @@ src/
 ```
 
 ### 17.1 Folder Structure Rules
-- WPF-specific code must remain in `WpfAutomation.App`
-- Playwright-facing automation code must remain in `WpfAutomation.Core`
+- WPF-specific code must remain in `AllItems.Automation.Browser.App`
+- Playwright-facing automation code must remain in `AllItems.Automation.Browser.Core`
 - Inspection JavaScript snippets must be isolated under `Inspection/JavaScript`
 - Reports must be DTO-style and serializable
 - Integration tests must validate frames and shadow DOM

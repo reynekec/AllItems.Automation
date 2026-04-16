@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\WpfAutomation.Core\WpfAutomation.Core.csproj" />
-    <ProjectReference Include="..\..\WpfAutomation.App\WpfAutomation.App.csproj" />
+    <ProjectReference Include="..\..\AllItems.Automation.Browser.Core\AllItems.Automation.Browser.Core.csproj" />
+    <ProjectReference Include="..\..\AllItems.Automation.Browser.App\AllItems.Automation.Browser.App.csproj" />
   </ItemGroup>
 
 </Project>

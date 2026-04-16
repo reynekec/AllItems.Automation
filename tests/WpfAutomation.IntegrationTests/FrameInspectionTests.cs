@@ -1,6 +1,6 @@
 using FluentAssertions;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Inspection;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Inspection;
 using WpfAutomation.IntegrationTests.TestUtilities;
 
 namespace WpfAutomation.IntegrationTests;
@@ -10,7 +10,7 @@ public sealed class FrameInspectionTests
     [Fact]
     public async Task PageInspector_Captures_Main_And_Frame_Content()
     {
-        var (session, _) = await IntegrationHarness.TryStartSessionAsync(WpfAutomation.Core.Configuration.BrowserType.Chromium, new BrowserOptions
+        var (session, _) = await IntegrationHarness.TryStartSessionAsync(AllItems.Automation.Browser.Core.Configuration.BrowserType.Chromium, new BrowserOptions
         {
             Headless = true,
             TimeoutMs = 4000,

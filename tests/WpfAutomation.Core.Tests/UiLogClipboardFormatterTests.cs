@@ -1,5 +1,5 @@
 using FluentAssertions;
-using WpfAutomation.App.Models;
+using AllItems.Automation.Browser.App.Models;
 
 namespace WpfAutomation.Core.Tests;
 

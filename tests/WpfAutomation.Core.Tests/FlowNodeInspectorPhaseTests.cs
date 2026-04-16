@@ -1,12 +1,12 @@
 using System.Text.Json;
 using FluentAssertions;
-using WpfAutomation.App.Models;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.NodeInspector.Models;
-using WpfAutomation.App.NodeInspector.ViewModels;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.App.ViewModels;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.NodeInspector.Models;
+using AllItems.Automation.Browser.App.NodeInspector.ViewModels;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace WpfAutomation.Core.Tests;
 

@@ -1,11 +1,11 @@
 using FluentAssertions;
 using System.Windows;
-using WpfAutomation.App.Services;
-using WpfAutomation.App.ViewModels;
-using WpfAutomation.App.Commands;
-using WpfAutomation.App.Models;
-using WpfAutomation.Core.Diagnostics;
-using WpfAutomation.Core.Abstractions;
+using AllItems.Automation.Browser.App.Services;
+using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.App.Commands;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.Core.Diagnostics;
+using AllItems.Automation.Browser.Core.Abstractions;
 
 namespace WpfAutomation.Core.Tests;
 

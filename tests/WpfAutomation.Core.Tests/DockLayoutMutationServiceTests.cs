@@ -1,6 +1,6 @@
 using FluentAssertions;
-using WpfAutomation.App.Docking.Layout;
-using WpfAutomation.App.Docking.Services;
+using AllItems.Automation.Browser.App.Docking.Layout;
+using AllItems.Automation.Browser.App.Docking.Services;
 
 namespace WpfAutomation.Core.Tests;
 

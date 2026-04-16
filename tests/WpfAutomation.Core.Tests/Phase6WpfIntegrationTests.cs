@@ -1,11 +1,11 @@
 using FluentAssertions;
-using WpfAutomation.App.Models;
-using WpfAutomation.App.Services;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.App.ViewModels;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Abstractions;
-using WpfAutomation.Core.Diagnostics;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.App.Services;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Abstractions;
+using AllItems.Automation.Browser.Core.Diagnostics;
 
 namespace WpfAutomation.Core.Tests;
 
@@ -317,7 +317,7 @@ public sealed class Phase6WpfIntegrationTests
 
         viewModel.Panels.Should().ContainSingle(panel =>
             panel.PanelId == "canvas"
-            && panel.PanelKind == WpfAutomation.App.Docking.Models.DockPanelKind.DocumentWindow
+            && panel.PanelKind == AllItems.Automation.Browser.App.Docking.Models.DockPanelKind.DocumentWindow
             && panel.ShowTabHeader == false);
     }
 

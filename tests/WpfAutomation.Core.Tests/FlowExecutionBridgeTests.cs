@@ -1,16 +1,16 @@
 using FluentAssertions;
 using Microsoft.Playwright;
 using Moq;
-using WpfAutomation.App.Credentials.Models;
-using WpfAutomation.App.Models;
-using WpfAutomation.App.Models.Flow;
-using WpfAutomation.App.Services.Credentials;
-using WpfAutomation.App.Services.Flow;
-using WpfAutomation.Core.Abstractions;
-using WpfAutomation.Core.Browser;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
-using AppBrowserType = WpfAutomation.Core.Configuration.BrowserType;
+using AllItems.Automation.Browser.App.Credentials.Models;
+using AllItems.Automation.Browser.App.Models;
+using AllItems.Automation.Browser.App.Models.Flow;
+using AllItems.Automation.Browser.App.Services.Credentials;
+using AllItems.Automation.Browser.App.Services.Flow;
+using AllItems.Automation.Browser.Core.Abstractions;
+using AllItems.Automation.Browser.Core.Browser;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
+using AppBrowserType = AllItems.Automation.Browser.Core.Configuration.BrowserType;
 
 namespace WpfAutomation.Core.Tests;
 

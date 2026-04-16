@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Microsoft.Playwright;
-using WpfAutomation.Core.Configuration;
-using WpfAutomation.Core.Diagnostics;
-using WpfAutomation.Core.Elements;
-using WpfAutomation.Core.Inspection;
+using AllItems.Automation.Browser.Core.Configuration;
+using AllItems.Automation.Browser.Core.Diagnostics;
+using AllItems.Automation.Browser.Core.Elements;
+using AllItems.Automation.Browser.Core.Inspection;
 
 namespace WpfAutomation.Core.Tests;
 

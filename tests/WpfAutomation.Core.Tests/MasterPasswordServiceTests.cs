@@ -2,9 +2,9 @@ using System.Runtime.Versioning;
 using System.Security;
 using FluentAssertions;
 using Moq;
-using WpfAutomation.App.Credentials;
-using WpfAutomation.App.Credentials.Models;
-using WpfAutomation.App.Services.Credentials;
+using AllItems.Automation.Browser.App.Credentials;
+using AllItems.Automation.Browser.App.Credentials.Models;
+using AllItems.Automation.Browser.App.Services.Credentials;
 
 namespace WpfAutomation.Core.Tests;
 

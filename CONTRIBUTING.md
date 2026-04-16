@@ -3,8 +3,8 @@
 ## Code Style Guidelines
 
 - Follow existing project naming and folder conventions.
-- Keep WPF-specific concerns in `WpfAutomation.App`.
-- Keep Playwright-facing automation in `WpfAutomation.Core`.
+- Keep WPF-specific concerns in `AllItems.Automation.Browser.App`.
+- Keep Playwright-facing automation in `AllItems.Automation.Browser.Core`.
 - Prefer async-first APIs and propagate `CancellationToken` where supported.
 - Use wrapped domain exceptions with context (action, url, selector, timeout, screenshot path).
 - Keep diagnostics meaningful and consistent (`Info`, `Warn`, `Error`).
@@ -27,8 +27,8 @@ dotnet test WpfAutomation.sln --no-build
 
 ## How To Add New Search Methods
 
-1. Add the method contract to `WpfAutomation.Core/Abstractions/ISearchContext.cs`.
-2. Implement the method in `WpfAutomation.Core/Search/SearchContext.cs`.
+1. Add the method contract to `AllItems.Automation.Browser.Core/Abstractions/ISearchContext.cs`.
+2. Implement the method in `AllItems.Automation.Browser.Core/Search/SearchContext.cs`.
 3. Ensure selector descriptions are diagnostic-friendly.
 4. Add unit tests to `tests/WpfAutomation.Core.Tests/SearchAndElementTests.cs`.
 5. Add integration tests in `tests/WpfAutomation.IntegrationTests/InteractionTests.cs` when applicable.

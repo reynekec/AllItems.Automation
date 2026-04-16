@@ -1,0 +1,44 @@
+<Window x:Class="SelectorDemo.Wpf.SelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Selection Details" Width="600" Height="400" WindowStartupLocation="CenterOwner" Icon="SelectorDemo.ico" Background="#F3F3F3">
+    <Window.Resources>
+        <ResourceDictionary Source="Styles.xaml"/>
+    </Window.Resources>
+    
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top"
+                   Margin="0,0,0,8"
+                   FontWeight="SemiBold"
+                   Foreground="#333333"
+                   Text="Status" />
+        <TextBox DockPanel.Dock="Top"
+                 x:Name="StatusTextBox"
+                 IsReadOnly="True"
+                 Style="{StaticResource ModernTextBoxStyle}"
+                 Margin="0,0,0,12"
+                 Height="40"
+                 Text="Ready. Navigate to a page and click Start Selection in the Browser window." />
+
+        <Grid DockPanel.Dock="Bottom">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Foreground="#333333" Text="CSS Selector"/>
+                <TextBox x:Name="CssSelectorTextBox" IsReadOnly="True" Style="{StaticResource ModernTextBoxStyle}" TextWrapping="Wrap" MinHeight="68"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+                <TextBlock Margin="0,0,0,4" FontWeight="SemiBold" Foreground="#333333" Text="XPath Selector"/>
+                <TextBox x:Name="XPathSelectorTextBox" IsReadOnly="True" Style="{StaticResource ModernTextBoxStyle}" TextWrapping="Wrap" MinHeight="68"/>
+            </StackPanel>
+        </Grid>
+    </DockPanel>
+</Window>
