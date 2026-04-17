@@ -189,9 +189,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Margin="0,0,0,10" Background="#FFF2F6FA" BorderBrush="#FFE1E8F0" BorderThickness="1" CornerRadius="0">
-            <ToolBarTray Background="Transparent" IsLocked="True">
-                <ToolBar Background="Transparent" BorderThickness="0" Padding="8,6">
-                    <StackPanel Orientation="Horizontal">
+            <Grid Margin="8,6">
+                <StackPanel Orientation="Horizontal">
                         <Border Style="{StaticResource CanvasToolbarGroupStyle}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -484,9 +483,8 @@
                                 <TextBlock Style="{StaticResource CanvasToolbarGlyphStyle}" Text="&#xE713;" />
                             </Button>
                         </Border>
-                    </StackPanel>
-                </ToolBar>
-            </ToolBarTray>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <Border Grid.Row="1" BorderBrush="#FFD2DBE6" BorderThickness="1" CornerRadius="0" Background="#FFFFFFFF">

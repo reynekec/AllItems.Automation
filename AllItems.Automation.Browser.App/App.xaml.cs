@@ -74,6 +74,7 @@ public partial class App : Application
 		services.AddSingleton<IFlowActionParameterResolver, FlowActionParameterResolver>();
 		services.AddSingleton<IFlowEditingService, FlowEditingService>();
 		services.AddSingleton<IFlowPersistenceService, FlowPersistenceService>();
+		services.AddSingleton<IFlowRecentFileService, FlowRecentFileService>();
 		services.AddSingleton<IFlowEdgeRoutingService, FlowEdgeRoutingService>();
 		services.AddSingleton<IFlowHitTestService, FlowHitTestService>();
 		services.AddSingleton<IFlowLayoutService, FlowLayoutService>();

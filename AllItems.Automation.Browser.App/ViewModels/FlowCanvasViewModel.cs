@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
@@ -31,6 +32,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
     private readonly DiagnosticsService _diagnosticsService;
     private readonly IFlowEditingService _editingService;
     private readonly IFlowPersistenceService _persistenceService;
+    private readonly IFlowRecentFileService _recentFileService;
     private readonly IFlowEdgeRoutingService _routingService;
     private readonly IFlowHitTestService _hitTestService;
     private readonly IFlowLayoutService _layoutService;
@@ -55,6 +57,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         DiagnosticsService diagnosticsService,
         IFlowEditingService editingService,
         IFlowPersistenceService persistenceService,
+        IFlowRecentFileService recentFileService,
         IFlowEdgeRoutingService routingService,
         IFlowHitTestService hitTestService,
         IFlowLayoutService layoutService,
@@ -64,6 +67,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         _diagnosticsService = diagnosticsService;
         _editingService = editingService;
         _persistenceService = persistenceService;
+        _recentFileService = recentFileService;
         _routingService = routingService;
         _hitTestService = hitTestService;
         _layoutService = layoutService;
@@ -637,22 +641,7 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
 
         try
         {
-            var loaded = await _persistenceService.OpenAsync(dialog.FileName);
-            AppCrashLogger.Info($"OpenAsync: file loaded. Nodes={loaded.Nodes.Count}, Edges={loaded.Edges.Count}.");
-
-            var validation = FlowDocumentValidator.Validate(loaded);
-            if (!validation.IsValid)
-            {
-                _diagnosticsService.Warn("Loaded flow has validation warnings.", new Dictionary<string, string> { ["errors"] = string.Join(" | ", validation.Errors) });
-                AppCrashLogger.Info($"OpenAsync: validation warnings: {string.Join(" | ", validation.Errors)}");
-            }
-
-            AppCrashLogger.Info("OpenAsync: assigning Document.");
-            _undoStack.Push(Document);
-            _redoStack.Clear();
-            Document = loaded;
-            AppCrashLogger.Info("OpenAsync: Document assigned.");
-            SetCurrentDocumentPath(dialog.FileName);
+            await OpenDocumentAsync(dialog.FileName);
             _diagnosticsService.Info($"Opened flow document from '{dialog.FileName}'.");
             AppCrashLogger.Info("OpenAsync: complete.");
         }
@@ -660,6 +649,42 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         {
             AppCrashLogger.Error($"OpenAsync: failed to load '{dialog.FileName}'.", exception);
             _diagnosticsService.Error($"Failed to open flow document '{dialog.FileName}'.", exception);
+        }
+    }
+
+    public async Task TryOpenLastFlowOnStartupAsync()
+    {
+        string? lastFlowPath;
+        try
+        {
+            lastFlowPath = _recentFileService.GetLastFlowPath();
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsService.Warn($"Unable to read last flow file from local state. {exception.Message}");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(lastFlowPath))
+        {
+            return;
+        }
+
+        if (!File.Exists(lastFlowPath))
+        {
+            _recentFileService.ClearLastFlowPath();
+            _diagnosticsService.Warn($"Last opened flow file was not found at '{lastFlowPath}'.");
+            return;
+        }
+
+        try
+        {
+            await OpenDocumentAsync(lastFlowPath);
+            _diagnosticsService.Info($"Restored last flow document from '{lastFlowPath}'.");
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsService.Error($"Failed to restore last flow document '{lastFlowPath}'.", exception);
         }
     }
 
@@ -1033,6 +1058,18 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
         }
 
         _currentDocumentPath = filePath;
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            try
+            {
+                _recentFileService.SetLastFlowPath(filePath);
+            }
+            catch (Exception exception)
+            {
+                _diagnosticsService.Warn($"Unable to persist last flow file path. {exception.Message}");
+            }
+        }
+
         OnPropertyChanged(nameof(HasOpenedFile));
 
         if (SaveCommand is AsyncRelayCommand save)
@@ -1185,10 +1222,29 @@ public sealed class FlowCanvasViewModel : INotifyPropertyChanged
             diagnosticsService,
             new FlowEditingService(),
             new FlowPersistenceService(),
+            new FlowRecentFileService(),
             new FlowEdgeRoutingService(),
             new FlowHitTestService(),
             new FlowLayoutService(),
             new FlowExecutionMapper(),
             new DefaultNodeInspectorFactory());
+    }
+
+    private async Task OpenDocumentAsync(string filePath)
+    {
+        var loaded = await _persistenceService.OpenAsync(filePath);
+        AppCrashLogger.Info($"Flow loaded. Nodes={loaded.Nodes.Count}, Edges={loaded.Edges.Count}.");
+
+        var validation = FlowDocumentValidator.Validate(loaded);
+        if (!validation.IsValid)
+        {
+            _diagnosticsService.Warn("Loaded flow has validation warnings.", new Dictionary<string, string> { ["errors"] = string.Join(" | ", validation.Errors) });
+            AppCrashLogger.Info($"Flow load validation warnings: {string.Join(" | ", validation.Errors)}");
+        }
+
+        _undoStack.Push(Document);
+        _redoStack.Clear();
+        Document = loaded;
+        SetCurrentDocumentPath(filePath);
     }
 }

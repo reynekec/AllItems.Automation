@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     {
         Loaded -= OnLoaded;
         await _viewModel.InitializeDockingAsync();
+        await _viewModel.FlowCanvas.TryOpenLastFlowOnStartupAsync();
 
         if (!_viewModel.HasRestorableDockPanels())
         {
