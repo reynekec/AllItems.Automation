@@ -29,6 +29,8 @@ public sealed class DockPanelContentTemplateSelector : DataTemplateSelector
         {
             "action-panel" => ActionPanelTemplate ?? DefaultTemplate,
             "canvas" => CanvasDocumentTemplate ?? DefaultTemplate,
+            "runner-controls" => NodeInspectorTemplate ?? DefaultTemplate,
+            "errors" => EmptyToolTemplate ?? DefaultTemplate,
             "logs" => LogsPanelTemplate ?? DefaultTemplate,
             _ => DefaultTemplate,
         };

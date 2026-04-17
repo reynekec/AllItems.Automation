@@ -5,7 +5,7 @@ namespace AllItems.Automation.Browser.App.Docking.Layout;
 /// </summary>
 public sealed record DockLayoutSnapshot
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 

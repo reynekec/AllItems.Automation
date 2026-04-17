@@ -844,40 +844,30 @@ public partial class DockHost : UserControl, INotifyPropertyChanged
     private void PopulateDefaultDockDistribution()
     {
         var orderedPanels = _allPanels.OrderBy(panel => panel.TabOrder).ToList();
+        var placedPanelIds = new HashSet<string>(StringComparer.Ordinal);
 
-        if (orderedPanels.Count > 0)
+        void TryPlacePanel(string panelId, ICollection<DockPanelState> zonePanels, DockZone zone)
         {
-            AddPanelToZone(orderedPanels[0], _leftPanels, DockZone.Left);
+            var panel = orderedPanels.FirstOrDefault(candidate =>
+                string.Equals(candidate.PanelId, panelId, StringComparison.Ordinal));
+            if (panel is null)
+            {
+                return;
+            }
+
+            AddPanelToZone(panel, zonePanels, zone);
+            placedPanelIds.Add(panel.PanelId);
         }
 
-        if (orderedPanels.Count > 1)
-        {
-            AddPanelToZone(orderedPanels[1], _centerPanels, DockZone.Center);
-        }
+        TryPlacePanel("action-panel", _leftPanels, DockZone.Left);
+        TryPlacePanel("canvas", _centerPanels, DockZone.Center);
+        TryPlacePanel("runner-controls", _rightPanels, DockZone.Right);
+        TryPlacePanel("errors", _bottomPanels, DockZone.Bottom);
+        TryPlacePanel("logs", _bottomPanels, DockZone.Bottom);
 
-        if (orderedPanels.Count > 2)
+        foreach (var panel in orderedPanels.Where(panel => !placedPanelIds.Contains(panel.PanelId)))
         {
-            AddPanelToZone(orderedPanels[2], _rightPanels, DockZone.Right);
-        }
-
-        if (orderedPanels.Count > 3)
-        {
-            AddPanelToZone(orderedPanels[3], _rightPanels, DockZone.Right);
-        }
-
-        if (orderedPanels.Count > 4)
-        {
-            AddPanelToZone(orderedPanels[4], _bottomPanels, DockZone.Bottom);
-        }
-
-        if (orderedPanels.Count > 5)
-        {
-            AddPanelToZone(orderedPanels[5], _bottomPanels, DockZone.Bottom);
-        }
-
-        for (var index = 6; index < orderedPanels.Count; index++)
-        {
-            AddPanelToZone(orderedPanels[index], _centerPanels, DockZone.Center);
+            AddPanelToZone(panel, panel.IsToolWindow ? _rightPanels : _centerPanels, panel.IsToolWindow ? DockZone.Right : DockZone.Center);
         }
 
         ResetTabOrder(_leftPanels);

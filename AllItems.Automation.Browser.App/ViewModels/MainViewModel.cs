@@ -167,6 +167,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         [
             new DockPanelDescriptor { PanelId = "action-panel", Title = "Action Panel", ContentKey = "Action panel", PanelKind = DockPanelKind.ToolWindow },
             new DockPanelDescriptor { PanelId = "canvas", Title = "Canvas", ContentKey = "Canvas", PanelKind = DockPanelKind.DocumentWindow, ShowTabHeader = false, IsPinnable = false, IsClosable = false },
+            new DockPanelDescriptor { PanelId = "runner-controls", Title = "Properties", ContentKey = "Properties", PanelKind = DockPanelKind.ToolWindow },
+            new DockPanelDescriptor { PanelId = "errors", Title = "Errors", ContentKey = "Errors", PanelKind = DockPanelKind.ToolWindow },
             new DockPanelDescriptor { PanelId = "logs", Title = "Logs", ContentKey = "Logs", PanelKind = DockPanelKind.ToolWindow },
         ];
 
@@ -404,7 +406,53 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
 
         var mappedPanelCount = snapshotPanelIds.Count(knownPanelIds.Contains);
 
+        if (IsLegacyDefaultDockLayout(ActiveLayout))
+        {
+            return false;
+        }
+
         return mappedPanelCount >= 3;
+    }
+
+    private static bool IsLegacyDefaultDockLayout(DockLayoutSnapshot snapshot)
+    {
+        if (snapshot.Groups.Count == 0)
+        {
+            return false;
+        }
+
+        var leftIds = snapshot.Groups
+            .FirstOrDefault(group => string.Equals(group.GroupId, "left", StringComparison.Ordinal))?
+            .Panels
+            .Select(panel => panel.PanelId)
+            .ToHashSet(StringComparer.Ordinal)
+            ?? [];
+
+        var centerIds = snapshot.Groups
+            .FirstOrDefault(group => string.Equals(group.GroupId, "center", StringComparison.Ordinal))?
+            .Panels
+            .Select(panel => panel.PanelId)
+            .ToHashSet(StringComparer.Ordinal)
+            ?? [];
+
+        var rightIds = snapshot.Groups
+            .FirstOrDefault(group => string.Equals(group.GroupId, "right", StringComparison.Ordinal))?
+            .Panels
+            .Select(panel => panel.PanelId)
+            .ToHashSet(StringComparer.Ordinal)
+            ?? [];
+
+        var bottomIds = snapshot.Groups
+            .FirstOrDefault(group => string.Equals(group.GroupId, "bottom", StringComparison.Ordinal))?
+            .Panels
+            .Select(panel => panel.PanelId)
+            .ToHashSet(StringComparer.Ordinal)
+            ?? [];
+
+        return leftIds.SetEquals(["action-panel"]) &&
+               centerIds.SetEquals(["canvas"]) &&
+               rightIds.SetEquals(["runner-controls", "errors"]) &&
+               bottomIds.SetEquals(["logs"]);
     }
 
     private async Task RunAsync(CancellationToken commandToken)

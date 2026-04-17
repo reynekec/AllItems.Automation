@@ -322,12 +322,14 @@ public sealed class Phase6WpfIntegrationTests
     }
 
     [Fact]
-    public void Properties_And_Errors_Dock_Panels_Are_Not_Present_In_Main_Dock()
+    public void Properties_Panel_Reuses_Runner_Slot_And_Removes_Legacy_Properties_Panel()
     {
         var viewModel = new MainViewModel(new FakeAutomationOrchestrator(), new FakeActionCatalogBuilder(), new DiagnosticsService(), new ImmediateUiDispatcherService());
 
-        viewModel.Panels.Should().NotContain(panel => panel.PanelId == "runner-controls");
-        viewModel.Panels.Should().NotContain(panel => panel.PanelId == "errors");
+        viewModel.Panels.Should().ContainSingle(panel =>
+            panel.PanelId == "runner-controls"
+            && panel.Title == "Properties"
+            && panel.ContentKey == "Properties");
         viewModel.Panels.Should().NotContain(panel => panel.PanelId == "properties");
     }
 

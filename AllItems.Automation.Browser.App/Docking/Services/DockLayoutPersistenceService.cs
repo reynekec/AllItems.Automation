@@ -61,7 +61,7 @@ public sealed class DockLayoutPersistenceService : IDockLayoutPersistenceService
                 return CreateDefaultSnapshot();
             }
 
-            if (snapshot.SchemaVersion > DockLayoutSnapshot.CurrentSchemaVersion)
+            if (snapshot.SchemaVersion != DockLayoutSnapshot.CurrentSchemaVersion)
             {
                 return CreateDefaultSnapshot();
             }
