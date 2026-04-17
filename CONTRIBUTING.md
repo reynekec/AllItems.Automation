@@ -22,16 +22,16 @@ dotnet build WpfAutomation.sln
 dotnet test WpfAutomation.sln --no-build
 ```
 3. If adding inspection/search behavior, include integration coverage under:
-- `tests/WpfAutomation.Core.Tests`
-- `tests/WpfAutomation.IntegrationTests`
+- `tests/AllItems.Automation.Core.Tests`
+- `tests/AllItems.Automation.IntegrationTests`
 
 ## How To Add New Search Methods
 
 1. Add the method contract to `AllItems.Automation.Browser.Core/Abstractions/ISearchContext.cs`.
 2. Implement the method in `AllItems.Automation.Browser.Core/Search/SearchContext.cs`.
 3. Ensure selector descriptions are diagnostic-friendly.
-4. Add unit tests to `tests/WpfAutomation.Core.Tests/SearchAndElementTests.cs`.
-5. Add integration tests in `tests/WpfAutomation.IntegrationTests/InteractionTests.cs` when applicable.
+4. Add unit tests to `tests/AllItems.Automation.Core.Tests/SearchAndElementTests.cs`.
+5. Add integration tests in `tests/AllItems.Automation.IntegrationTests/InteractionTests.cs` when applicable.
 
 ## Pull Request Notes
 

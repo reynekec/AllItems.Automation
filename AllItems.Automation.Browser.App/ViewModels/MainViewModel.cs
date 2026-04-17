@@ -167,8 +167,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IUiActionsSidebarCom
         [
             new DockPanelDescriptor { PanelId = "action-panel", Title = "Action Panel", ContentKey = "Action panel", PanelKind = DockPanelKind.ToolWindow },
             new DockPanelDescriptor { PanelId = "canvas", Title = "Canvas", ContentKey = "Canvas", PanelKind = DockPanelKind.DocumentWindow, ShowTabHeader = false, IsPinnable = false, IsClosable = false },
-            new DockPanelDescriptor { PanelId = "runner-controls", Title = "Properties", ContentKey = "Properties", PanelKind = DockPanelKind.ToolWindow },
-            new DockPanelDescriptor { PanelId = "errors", Title = "Errors", ContentKey = "Errors", PanelKind = DockPanelKind.ToolWindow },
             new DockPanelDescriptor { PanelId = "logs", Title = "Logs", ContentKey = "Logs", PanelKind = DockPanelKind.ToolWindow },
         ];
 

@@ -1,5 +1,6 @@
 using System.Windows;
 using AllItems.Automation.Browser.App.ViewModels;
+using AllItems.Automation.Browser.App.Views;
 
 namespace AllItems.Automation.Browser.App;
 
@@ -25,5 +26,11 @@ public partial class TestDockWindow : Window
         {
             DockHost.ResetLayoutToDefault();
         }
+    }
+
+    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var settings = new SettingsWindow { Owner = this };
+        settings.ShowDialog();
     }
 }

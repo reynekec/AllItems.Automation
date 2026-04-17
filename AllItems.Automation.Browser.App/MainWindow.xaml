@@ -61,18 +61,45 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <docking:DockHost Grid.Row="0"
+        <!-- Toolbar -->
+        <Border Grid.Row="0"
+                Margin="0,0,0,8"
+                Padding="8,6"
+                Background="#FFF7FAFC"
+                BorderBrush="#FFD0D7DE"
+                BorderThickness="1"
+                CornerRadius="6">
+            <DockPanel LastChildFill="False">
+                <Button DockPanel.Dock="Right"
+                        Width="36"
+                        Height="36"
+                        ToolTip="Settings"
+                        Click="OnSettingsClick"
+                        Background="#FFFFFFFF"
+                        BorderBrush="#FFD0D7DE"
+                        BorderThickness="1"
+                        Padding="0">
+                    <Viewbox Width="18" Height="18" Stretch="Uniform">
+                        <Path Fill="#FF1F2937"
+                              Data="M8 0L9.2 1.8C9.6 1.9 10 2.1 10.4 2.3L12.5 1.7L14.1 4.3L12.6 5.9C12.7 6.3 12.8 6.7 12.8 7.1L14.6 8.3L13.3 10.9L11.1 10.7C10.8 11 10.4 11.3 10 11.5L9.7 13.7H6.9L6.6 11.5C6.2 11.3 5.8 11 5.5 10.7L3.3 10.9L2 8.3L3.8 7.1C3.8 6.7 3.9 6.3 4 5.9L2.5 4.3L4.1 1.7L6.2 2.3C6.6 2.1 7 1.9 7.4 1.8L8.6 0H8ZM8.3 4.3C6.7 4.3 5.4 5.6 5.4 7.2C5.4 8.8 6.7 10.1 8.3 10.1C9.9 10.1 11.2 8.8 11.2 7.2C11.2 5.6 9.9 4.3 8.3 4.3Z" />
+                    </Viewbox>
+                </Button>
+            </DockPanel>
+        </Border>
+
+        <docking:DockHost Grid.Row="1"
                           x:Name="MainDockHost"
                           PanelsSource="{Binding Panels}"
                           ActiveLayout="{Binding ActiveLayout, Mode=TwoWay}"
                           LayoutChangedCommand="{Binding LayoutChangedCommand}"
                           PanelContentTemplateSelector="{StaticResource MainDockPanelContentTemplateSelector}" />
 
-        <views:StatusBarControl Grid.Row="1"
+        <views:StatusBarControl Grid.Row="2"
                                 Margin="0,12,0,0"
                                 ItemsSource="{Binding StatusBarItems}" />
 

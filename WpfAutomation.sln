@@ -9,9 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AllItems.Automation.Browser
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfAutomation.Core.Tests", "tests\WpfAutomation.Core.Tests\WpfAutomation.Core.Tests.csproj", "{2ADD14C8-4586-4A53-9E0A-AFD655164DF9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AllItems.Automation.Core.Tests", "tests\AllItems.Automation.Core.Tests\AllItems.Automation.Core.Tests.csproj", "{2ADD14C8-4586-4A53-9E0A-AFD655164DF9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfAutomation.IntegrationTests", "tests\WpfAutomation.IntegrationTests\WpfAutomation.IntegrationTests.csproj", "{0512EC83-5CBF-4BE4-9681-F6F10D37DE3D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AllItems.Automation.IntegrationTests", "tests\AllItems.Automation.IntegrationTests\AllItems.Automation.IntegrationTests.csproj", "{0512EC83-5CBF-4BE4-9681-F6F10D37DE3D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ai", "ai", "{1DC9F6D7-2266-492A-A227-B4B4340346EE}"
 	ProjectSection(SolutionItems) = preProject

@@ -21,6 +21,19 @@ public partial class FlowCanvasView : UserControl
         InitializeComponent();
     }
 
+    private void OnSettingsClick(object sender, RoutedEventArgs eventArgs)
+    {
+        var owner = Window.GetWindow(this);
+        var settingsWindow = new SettingsWindow();
+
+        if (owner is not null)
+        {
+            settingsWindow.Owner = owner;
+        }
+
+        settingsWindow.ShowDialog();
+    }
+
     private FlowCanvasViewModel? ViewModel => DataContext as FlowCanvasViewModel;
 
     private void OnSurfaceDrop(object sender, DragEventArgs eventArgs)

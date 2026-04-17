@@ -869,13 +869,13 @@ src/
 │     └─ BoundingBoxReport.cs
 │
 └─ tests/
-   ├─ WpfAutomation.Core.Tests/
+   ├─ AllItems.Automation.Core.Tests/
    │  ├─ Browser/
    │  ├─ Search/
    │  ├─ Elements/
    │  ├─ Inspection/
    │  └─ Diagnostics/
-   └─ WpfAutomation.IntegrationTests/
+    └─ AllItems.Automation.IntegrationTests/
       ├─ NavigationTests.cs
       ├─ InteractionTests.cs
       ├─ FrameInspectionTests.cs
